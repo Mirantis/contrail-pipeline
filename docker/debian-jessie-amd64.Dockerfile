@@ -1,8 +1,8 @@
 FROM debian:jessie
 
 ARG artifactory_url
-ARG extra_repo_url="deb http://apt-mk.mirantis.com/jessie/ nightly extra"
-ARG extra_repo_key_url="http://apt-mk.mirantis.com/public.gpg"
+ARG extra_repo_url="deb http://apt.mirantis.com/jessie/ nightly extra"
+ARG extra_repo_key_url="http://apt.mirantis.com/public.gpg"
 ARG timestamp
 ARG uid=1000
 
