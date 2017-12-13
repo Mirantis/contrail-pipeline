@@ -321,11 +321,6 @@ node('docker') {
                 debian.importGpgKey("launchpad-private")
                 debian.uploadPpa(PPA, "src/build/packages", "launchpad-private")
             }
-            if (DIST == "xenial" && SOURCE_BRANCH == "R4.0") {
-                stage("rebuild docker images") {
-                    build job: "docker-build-images-opencontrail", parameters: []
-                }
-            }
         }
     } catch (Throwable e) {
        // If there was an exception thrown, the build failed
