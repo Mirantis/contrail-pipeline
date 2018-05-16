@@ -49,7 +49,6 @@ def components = [
     ["contrail-controller", "controller", SOURCE_BRANCH],
     ["contrail-vrouter", "vrouter", SOURCE_BRANCH],
     ["contrail-third-party", "third_party", SOURCE_BRANCH],
-    ["contrail-generateDS", "tools/generateds", SOURCE_BRANCH],
     ["contrail-sandesh", "tools/sandesh", SOURCE_BRANCH],
     ["contrail-packages", "tools/packages", SOURCE_BRANCH],
     ["contrail-nova-vif-driver", "openstack/nova_contrail_vif", SOURCE_BRANCH],
@@ -64,6 +63,9 @@ def components = [
     ["contrail-webui-third-party", "contrail-webui-third-party", SOURCE_BRANCH],
     ["contrail-dpdk", "third_party/dpdk", DPDK_BRANCH]
 ]
+
+if (SOURCE_BRANCH != "R5.0")
+    components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
 
 def sourcePackages = [
     "contrail-web-core",
