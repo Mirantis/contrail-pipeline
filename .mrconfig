@@ -11,73 +11,56 @@ update = git pull --rebase
 git_review = git review
 
 [src/tools/build]
-skip = lazy
 checkout = git_checkout contrail-build build $SOURCE_BRANCH
 
 [src/controller]
-skip = lazy
 checkout = git_checkout contrail-controller controller $SOURCE_BRANCH
 
 [src/vrouter]
-skip = lazy
 checkout = git_checkout contrail-vrouter vrouter $SOURCE_BRANCH
 
 [src/third_party]
-skip = lazy
 checkout = git_checkout contrail-third-party third_party $SOURCE_BRANCH
 
 [src/tools/generateds]
-skip = lazy
+skip = expr $SOURCE_BRANCH '>=' R5.0 > /dev/null
 checkout = git_checkout contrail-generateDS generateds $SOURCE_BRANCH
 
 [src/tools/sandesh]
-skip = lazy
 checkout = git_checkout contrail-sandesh sandesh $SOURCE_BRANCH
 
 [src/tools/packages]
-skip = lazy
 checkout = git_checkout contrail-packages packages $SOURCE_BRANCH
 
 [src/openstack/nova_contrail_vif]
-skip = lazy
 checkout = git_checkout contrail-nova-vif-driver nova_contrail_vif $SOURCE_BRANCH
 
 [src/openstack/neutron_plugin]
-skip = lazy
 checkout = git_checkout contrail-neutron-plugin neutron_plugin $SOURCE_BRANCH
 
 [src/openstack/nova_extensions]
-skip = lazy
 checkout = git_checkout contrail-nova-extensions nova_extensions $SOURCE_BRANCH
 
 [src/openstack/contrail-heat]
-skip = lazy
 checkout = git_checkout contrail-heat contrail-heat $SOURCE_BRANCH
 
 [src/openstack/ceilometer_plugin]
-skip = lazy
 checkout = git_checkout contrail-ceilometer-plugin ceilometer_plugin master
 
 [src/contrail-web-storage]
-skip = lazy
 checkout = git_checkout contrail-web-storage contrail-web-storage $SOURCE_BRANCH
 
 [src/contrail-web-server-manager]
-skip = lazy
 checkout = git_checkout contrail-web-server-manager contrail-web-server-manager $SOURCE_BRANCH
 
 [src/contrail-web-controller]
-skip = lazy
 checkout = git_checkout contrail-web-controller contrail-web-controller $SOURCE_BRANCH
 
 [src/contrail-web-core]
-skip = lazy
 checkout = git_checkout contrail-web-core contrail-web-core $SOURCE_BRANCH
 
 [src/contrail-webui-third-party]
-skip = lazy
 checkout = git_checkout contrail-webui-third-party contrail-webui-third-party $SOURCE_BRANCH
 
 [src/third_party/dpdk]
-skip = lazy
 checkout = git_checkout contrail-dpdk dpdk $DPDK_SOURCE_BRANCH
