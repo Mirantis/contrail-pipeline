@@ -45,6 +45,10 @@ RUN apt-get update && apt-get install -y \
         python-lxml \
         autoconf \
         automake \
+        libgrok-dev \
+        libgrok1 \
+        libpcre3-dev \
+        libtokyocabinet-dev \
         libtool-bin \
         patch \
         unzip \
@@ -53,6 +57,7 @@ RUN apt-get update && apt-get install -y \
         ant \
         python-setuptools \
         python-nose \
+        python-pip \
         sudo \
         nodejs-legacy \
         npm \
