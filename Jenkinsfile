@@ -282,37 +282,39 @@ node('docker') {
         }
 
         if (gerritProject == "") {
-            stage("upload") {
-                buildSteps = [:]
-                debFiles = sh script: "ls src/build/*.deb", returnStdout: true
-                for (file in debFiles.tokenize()) {
-                    workspace = common.getWorkspace()
-                    def fh = new File("${workspace}/${file}".trim())
-                    if (art) {
-                        buildSteps[fh.name.split('_')[0]] = artifactory.uploadPackageStep(
-                            art,
-                            "src/build/${fh.name}",
-                            properties,
-                            DIST,
-                            'main',
-                            timestamp
-                        )
-                    } else {
-                        buildSteps[fh.name.split('_')[0]] = aptly.uploadPackageStep(
-                            "src/build/${fh.name}",
-                            APTLY_URL,
-                            aptlyRepo,
-                            true
-                        )
+            lock("aptly-api") {
+                stage("upload") {
+                    buildSteps = [:]
+                    debFiles = sh script: "ls src/build/*.deb", returnStdout: true
+                    for (file in debFiles.tokenize()) {
+                        workspace = common.getWorkspace()
+                        def fh = new File("${workspace}/${file}".trim())
+                        if (art) {
+                            buildSteps[fh.name.split('_')[0]] = artifactory.uploadPackageStep(
+                                art,
+                                "src/build/${fh.name}",
+                                properties,
+                                DIST,
+                                'main',
+                                timestamp
+                            )
+                        } else {
+                            buildSteps[fh.name.split('_')[0]] = aptly.uploadPackageStep(
+                                "src/build/${fh.name}",
+                                APTLY_URL,
+                                aptlyRepo,
+                                true
+                            )
+                        }
                     }
+                    parallel buildSteps
                 }
-                parallel buildSteps
-            }
 
-            if (! art) {
-                stage("publish") {
-                    aptly.snapshotRepo(APTLY_URL, aptlyRepo, timestamp)
-                    aptly.publish(APTLY_URL)
+                if (! art) {
+                    stage("publish") {
+                        aptly.snapshotRepo(APTLY_URL, aptlyRepo, timestamp)
+                        aptly.publish(APTLY_URL)
+                    }
                 }
             }
         }
