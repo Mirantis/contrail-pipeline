@@ -1,66 +1,13 @@
 [DEFAULT]
 lib = 
-	msg() {
-		echo "I: $1"
-	}
-	git_checkout() {
-		git clone -b ${3:-master} \
-			${GIT_CONTRAIL_BASE:-https://github.com/Mirantis}/$1.git $2
-	}
+        msg() {
+                echo "I: $1"
+        }
+        git_checkout() {
+                git clone -b ${3:-master} \
+                        ${GIT_CONTRAIL_BASE:-https://github.com/Mirantis}/$1.git $2
+        }
 update = git pull --rebase
 git_review = git review
 
-[src/tools/build]
-checkout = git_checkout contrail-build build $SOURCE_BRANCH
-
-[src/controller]
-checkout = git_checkout contrail-controller controller $SOURCE_BRANCH
-
-[src/vrouter]
-checkout = git_checkout contrail-vrouter vrouter $SOURCE_BRANCH
-
-[src/third_party]
-checkout = git_checkout contrail-third-party third_party $SOURCE_BRANCH
-
-[src/tools/generateds]
-skip = expr $SOURCE_BRANCH '>=' R5.0 > /dev/null
-checkout = git_checkout contrail-generateDS generateds $SOURCE_BRANCH
-
-[src/tools/sandesh]
-checkout = git_checkout contrail-sandesh sandesh $SOURCE_BRANCH
-
-[src/tools/packages]
-checkout = git_checkout contrail-packages packages $SOURCE_BRANCH
-
-[src/openstack/nova_contrail_vif]
-checkout = git_checkout contrail-nova-vif-driver nova_contrail_vif $SOURCE_BRANCH
-
-[src/openstack/neutron_plugin]
-checkout = git_checkout contrail-neutron-plugin neutron_plugin $SOURCE_BRANCH
-
-[src/openstack/nova_extensions]
-checkout = git_checkout contrail-nova-extensions nova_extensions $SOURCE_BRANCH
-
-[src/openstack/contrail-heat]
-checkout = git_checkout contrail-heat contrail-heat $SOURCE_BRANCH
-
-[src/openstack/ceilometer_plugin]
-checkout = git_checkout contrail-ceilometer-plugin ceilometer_plugin master
-
-[src/contrail-web-storage]
-checkout = git_checkout contrail-web-storage contrail-web-storage $SOURCE_BRANCH
-
-[src/contrail-web-server-manager]
-checkout = git_checkout contrail-web-server-manager contrail-web-server-manager $SOURCE_BRANCH
-
-[src/contrail-web-controller]
-checkout = git_checkout contrail-web-controller contrail-web-controller $SOURCE_BRANCH
-
-[src/contrail-web-core]
-checkout = git_checkout contrail-web-core contrail-web-core $SOURCE_BRANCH
-
-[src/contrail-webui-third-party]
-checkout = git_checkout contrail-webui-third-party contrail-webui-third-party $SOURCE_BRANCH
-
-[src/third_party/dpdk]
-checkout = git_checkout contrail-dpdk dpdk $DPDK_SOURCE_BRANCH
+include = cat mrconfigs/mrconfig-$SOURCE_BRANCH
