@@ -64,19 +64,24 @@ def components = [
     ["contrail-dpdk", "third_party/dpdk", DPDK_BRANCH]
 ]
 
-if (SOURCE_BRANCH != "R5.0")
-    components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
-
 def sourcePackages = [
     "contrail-web-core",
     "contrail-web-controller",
     "contrail",
     "contrail-vrouter-dpdk",
-    "ifmap-server",
     "neutron-plugin-contrail",
     "ceilometer-plugin-contrail",
     "contrail-heat"
 ]
+
+if (SOURCE_BRANCH != "R5.0"){
+    components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
+    sourcePackages.add("ifmap-server")
+} else {
+    components.add(["contrail-analytics", "src/contrail-analytics", SOURCE_BRANCH])
+    components.add(["contrail-api-client", "src/contrail-api-client", SOURCE_BRANCH])
+    components.add(["contrail-common", "src/contrail-common", SOURCE_BRANCH])
+}
 
 def inRepos = [
     "generic": [
