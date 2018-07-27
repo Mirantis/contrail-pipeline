@@ -66,6 +66,15 @@ RUN apt-get update && apt-get install -y \
         lsof \
         psmisc \
         eatmydata \
+        python-sphinx \
+        python-fixtures \
+        python-pydot \
+        ruby-ronn \
+        libsnmp-python \
+        libipfix-dev \
+        libsasl2-dev \
+        liblz4-dev \
+        librdkafka-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN useradd -s /bin/bash --uid $JENKINS_UID -m jenkins
