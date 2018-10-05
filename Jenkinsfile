@@ -78,6 +78,7 @@ if (SOURCE_BRANCH != "R5.0"){
     components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
     sourcePackages.add("ifmap-server")
 } else {
+//Add resources specific to version 5.0
     components.add(["contrail-analytics", "src/contrail-analytics", SOURCE_BRANCH])
     components.add(["contrail-api-client", "src/contrail-api-client", SOURCE_BRANCH])
     components.add(["contrail-common", "src/contrail-common", SOURCE_BRANCH])
@@ -112,6 +113,8 @@ try {
     art = null
 }
 
+//SHA of last commit in given repo
+def repositoryShas = []
 def git_commit = [:]
 def properties = [:]
 def aptlyRepo = APTLY_REPO
@@ -135,6 +138,32 @@ def buildBinaryPackageStep(img, pkg, opts = '-b') {
             sh("cd src/build/${pkg}; sudo apt-get update; dpkg-checkbuilddeps 2>&1|rev|cut -d : -f 1|rev|sed 's,(.*),,g'|xargs sudo apt-get install -y")
             sh("cd src/build/${pkg}; debuild --no-lintian -uc -us ${opts}")
         }
+    }
+}
+
+def setRepositoryCommitIDs(commits){
+    repositoryShas.add(["CEILOMETER_SHA", commits["contrail-ceilometer-plugin"]])
+    repositoryShas.add(["HEAT_SHA", commits["contrail-heat"]])
+    repositoryShas.add(["WEB_CONTROLLER_SHA", commits["contrail-controller"]])
+    repositoryShas.add(["WEB_CORE_SHA", commits["contrail-web-core"]])
+    repositoryShas.add(["CONTROLLER_SHA", commits["contrail-controller"]])
+    repositoryShas.add(["NEUTRON_PLUGIN_SHA", commits["contrail-neutron-plugin"]])
+    repositoryShas.add(["NOVA_CONTRAIL_SHA", commits["contrail-nova-vif-driver"]])
+    repositoryShas.add(["THIRD_PARTY_SHA", commits["contrail-third-party"]])
+    repositoryShas.add(["VROUTER_SHA", commits["contrail-vrouter"]])
+
+    //Add resources specific to version 5.0
+    if(SOURCE_BRANCH == "R5.0"){
+        repositoryShas.add(["ANALYTICS_SHA", commits["contrail-analytics"]])
+        repositoryShas.add(["CONTRAIL_API_SHA", commits["contrail-api-client"]])
+    }
+}
+
+// Populate each pkg with commitID from which pakage will be build
+def populatePkgWithCodeSha(pkg){
+    controlFile = "src/tools/packages/debian/${pkg}/debian/control"
+    for(sha in repositoryShas){
+        sh "sed -i 's/XB-Private-MCP-Code-SHA: ${sha[0]}/XB-Private-MCP-Code-SHA: ${sha[1]}/g' ${controlFile}"
     }
 }
 
@@ -181,6 +210,8 @@ node('docker') {
             sh("test -e src/SConstruct || ln -s tools/build/SConstruct src/SConstruct")
             sh("test -e src/packages.make || ln -s tools/packages/packages.make src/packages.make")
             sh("test -d src/build && rm -rf src/build || true")
+
+            setRepositoryCommitIDs(git_commit)
         }
 
         if (art) {
@@ -252,6 +283,7 @@ node('docker') {
 
                 buildSteps = [:]
                 for (pkg in sourcePackages) {
+                    populatePkgWithCodeSha(pkg)
                     buildSteps[pkg] = buildSourcePackageStep(img, pkg, version)
                 }
                 //parallel buildSteps

@@ -7,6 +7,12 @@ OS   ?= ubuntu
 DIST ?= xenial
 ARCH ?= amd64
 
+REPOSITORY_TAGS := CEILOMETER_SHA HEAT_SHA WEB_CONTROLLER_SHA WEB_CORE_SHA CONTROLLER_SHA NEUTRON_PLUGIN_SHA NOVA_CONTRAIL_SHA THIRD_PARTY_SHA VROUTER_SHA
+
+ifeq ($(SOURCE_BRANCH), "R5.0")
+REPOSITORY_TAGS += ANALYTICS_SHA CONTRAIL_API_SHA
+endif
+
 all: checkout build-image build-source build-binary
 
 help:
@@ -40,7 +46,6 @@ test: build-source
 	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src -e USER=jenkins --rm=true build-$(OS)-$(DIST)-$(ARCH) /bin/bash -c "../scripts/run_tests.sh"
 
 build-source: \
-	fetch-third-party \
 	build-source-contrail-web-core \
 	build-source-contrail-web-controller \
 	build-source-contrail \
@@ -59,6 +64,7 @@ fetch-third-party:
 
 build-source-%:
 	$(eval PACKAGE := $(patsubst build-source-%,%,$@))
+	$(MAKE) add-code-specific-sha-$(PACKAGE)
 	(rm -f src/build/packages/${PACKAGE}_* || true)
 	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src --rm=true build-$(OS)-$(DIST)-$(ARCH) make -f packages.make source-package-${PACKAGE}
 
@@ -83,3 +89,24 @@ checkout:
 	SOURCE_BRANCH=${SOURCE_BRANCH} DPDK_SOURCE_BRANCH=${DPDK_SOURCE_BRANCH} GIT_CONTRAIL_BASE=${GIT_CONTRAIL_BASE} mr --trust-all -j4 update
 	(test -e src/SConstruct || ln -s tools/build/SConstruct src/SConstruct)
 	(test -e src/packages.make || ln -s tools/packages/packages.make src/packages.make)
+
+add-code-specific-sha-%: set-shas
+	$(eval PACKAGE := $(patsubst add-code-specific-sha-%,%,$@))
+	$(foreach sha, $(REPOSITORY_TAGS), \
+			(cd src/tools/packages/debian/$(PACKAGE)/debian;\
+			sed -i 's/XB-Private-MCP-Code-SHA: $(sha)/XB-Private-MCP-Code-SHA: $($(sha))/g' control);)
+
+set-shas:
+ifeq ($(SOURCE_BRANCH), "R5.0")
+	$(eval ANALYTICS_SHA := $(shell cd $(CWD)/src/src/contrail-analytics; git rev-parse HEAD))
+	$(eval CONTRAIL_API_SHA := $(shell cd $(CWD)/src/src/contrail-api-client; git rev-parse HEAD))
+endif
+	$(eval CEILOMETER_SHA := $(shell cd $(CWD)/src/openstack/ceilometer_plugin; git rev-parse HEAD))
+	$(eval HEAT_SHA := $(shell cd $(CWD)/src/openstack/contrail-heat; git rev-parse HEAD))
+	$(eval WEB_CONTROLLER_SHA := $(shell cd $(CWD)/src/contrail-web-controller; git rev-parse HEAD))
+	$(eval WEB_CORE_SHA := $(shell cd $(CWD)/src/contrail-web-core; git rev-parse HEAD))
+	$(eval CONTROLLER_SHA := $(shell cd $(CWD)/src/controller; git rev-parse HEAD))
+	$(eval NEUTRON_PLUGIN_SHA := $(shell cd $(CWD)/src/openstack/neutron_plugin; git rev-parse HEAD))
+	$(eval NOVA_CONTRAIL_SHA := $(shell cd $(CWD)/src/openstack/nova_contrail_vif; git rev-parse HEAD))
+	$(eval THIRD_PARTY_SHA := $(shell cd $(CWD)/src/third_party; git rev-parse HEAD))
+	$(eval VROUTER_SHA := $(shell cd $(CWD)/src/vrouter; git rev-parse HEAD))
