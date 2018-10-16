@@ -141,7 +141,8 @@ def buildBinaryPackageStep(img, pkg, opts = '-b') {
     }
 }
 
-def setRepositoryCommitIDs(commits){
+List setRepositoryCommitIDs(commits){
+    repositoryShas = []
     repositoryShas.add(["CEILOMETER_SHA", commits["contrail-ceilometer-plugin"]])
     repositoryShas.add(["HEAT_SHA", commits["contrail-heat"]])
     repositoryShas.add(["WEB_CONTROLLER_SHA", commits["contrail-controller"]])
@@ -157,10 +158,11 @@ def setRepositoryCommitIDs(commits){
         repositoryShas.add(["ANALYTICS_SHA", commits["contrail-analytics"]])
         repositoryShas.add(["CONTRAIL_API_SHA", commits["contrail-api-client"]])
     }
+    return repositoryShas
 }
 
 // Populate each pkg with commitID from which pakage will be build
-def populatePkgWithCodeSha(pkg){
+def populatePkgWithCodeSha(pkg, repositoryShas){
     controlFile = "src/tools/packages/debian/${pkg}/debian/control"
     for(sha in repositoryShas){
         sh "sed -i 's/XB-Private-MCP-Code-SHA: ${sha[0]}/XB-Private-MCP-Code-SHA: ${sha[1]}/g' ${controlFile}"
@@ -211,7 +213,7 @@ node('docker') {
             sh("test -e src/packages.make || ln -s tools/packages/packages.make src/packages.make")
             sh("test -d src/build && rm -rf src/build || true")
 
-            setRepositoryCommitIDs(git_commit)
+            repositoryShas = setRepositoryCommitIDs(git_commit)
         }
 
         if (art) {
@@ -283,7 +285,7 @@ node('docker') {
 
                 buildSteps = [:]
                 for (pkg in sourcePackages) {
-                    populatePkgWithCodeSha(pkg)
+                    populatePkgWithCodeSha(pkg, repositoryShas)
                     buildSteps[pkg] = buildSourcePackageStep(img, pkg, version)
                 }
                 //parallel buildSteps
