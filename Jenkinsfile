@@ -86,11 +86,18 @@ def sourcePackages = [
     "contrail-heat"
 ]
 
-if (SOURCE_BRANCH != "R5.0"){
-    components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
+// only for R3.x
+if (SOURCE_BRANCH ==~ /^R3\..*/) {
     sourcePackages.add("ifmap-server")
-} else {
-//Add resources specific to version 5.0
+}
+
+// only for R3.x and R4.x
+if (SOURCE_BRANCH ==~ /^R3\..*|^R4\..*/) {
+    components.add(["contrail-generateDS", "tools/generateds", SOURCE_BRANCH])
+}
+
+// only for R5.x
+if (SOURCE_BRANCH ==~ /^R5\..*/) {
     components.add(["contrail-analytics", "src/contrail-analytics", SOURCE_BRANCH])
     components.add(["contrail-api-client", "src/contrail-api-client", SOURCE_BRANCH])
     components.add(["contrail-common", "src/contrail-common", SOURCE_BRANCH])
