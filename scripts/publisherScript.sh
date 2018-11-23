@@ -103,18 +103,23 @@ mkdir -p "${stagingDir}"
 [ -d "${pubDir}" ] && cp -Rl "${pubDir}" "${stagingDir}/"
 
 # Get new source name
-srcName=$(grep "^Source: " "${buildResultDir}"/*.dsc | awk '{print $NF}')
+srcNameList=(
+$(awk '/^Source: / {print $NF}' "${buildResultDir}"/*.dsc)
+)
 
-# Publish new packages
 pushd "${stagingDir}" &>/dev/null
 
+# Publish new packages
 aptly --config="${aptlyConfigFile}" repo create "${aptlyRepoName}" 2>/dev/null  || :
 
 # Remove old versions
-aptly --config="${aptlyConfigFile}" repo remove "${aptlyRepoName}" \
-    "\$Source (${srcName})" || :
-aptly --config="${aptlyConfigFile}" repo remove "${aptlyRepoName}" \
-    "Name (${srcName}), \$Architecture (source)" || :
+for srcName in ${srcNameList[@]}; do
+    aptly --config="${aptlyConfigFile}" repo remove "${aptlyRepoName}" \
+        "\$Source (${srcName})" || :
+    aptly --config="${aptlyConfigFile}" repo remove "${aptlyRepoName}" \
+        "Name (${srcName}), \$Architecture (source)" || :
+done
+
 aptly --config="${aptlyConfigFile}" db cleanup
 
 aptly --config="${aptlyConfigFile}" repo add "${aptlyRepoName}" "${buildResultDir}"
