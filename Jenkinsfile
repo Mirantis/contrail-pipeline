@@ -342,7 +342,14 @@ node('docker') {
                     stash([
                        name: 'builtArtifacts',
                        allowEmpty: false,
-                       includes: '*.deb, *.dsc, *.gz, *.xz'
+                       includes: '*.deb'
+                    ])
+                }
+                dir('src/build/packages') {
+                    stash([
+                       name: 'builtSources',
+                       allowEmpty: false,
+                       includes: '*.dsc, *.gz, *.xz, *.changes'
                     ])
                 }
                 String tmpSuffix = org.apache.commons.lang.RandomStringUtils
@@ -363,6 +370,7 @@ node('docker') {
                     ])
                     dir(buildResultDir){
                         unstash('builtArtifacts')
+                        unstash('builtSources')
                     }
                     withEnv([
                         "buildId=${mcpBuildId}",
