@@ -56,6 +56,9 @@ String trsyncRef = env.TRSYNC_REFSPEC ?: 'stable/0.9'
 String syncCredentials = env.RSYNC_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
 String mirrorList = env.MIRROR_LIST ?: 'jenkins@mirror.mcp.mirantis.net'
 
+def publishRetryAttempts = 10
+
+
 def components = [
     ["contrail-build", "tools/build", SOURCE_BRANCH],
     ["contrail-controller", "controller", SOURCE_BRANCH],
@@ -389,19 +392,20 @@ node('docker') {
                     ]) {
                         sh(publisherScript)
                     }
-                    withEnv([
-                        "buildId=${mcpBuildId}",
-                        "repoName=${repoName}",
-                        "repoDist=${repoDist}",
-                        "remoteRepoPath=/srv/aptly/public",
-                        "mirrorList=${mirrorList}",
-                        "trsyncDir=${trsyncPath}",
-                    ]) {
-                        sshagent (credentials: [syncCredentials]) {
-                            sh(syncScript)
+                    retry(publishRetryAttempts) {
+                        withEnv([
+                            "buildId=${mcpBuildId}",
+                            "repoName=${repoName}",
+                            "repoDist=${repoDist}",
+                            "remoteRepoPath=/srv/aptly/public",
+                            "mirrorList=${mirrorList}",
+                            "trsyncDir=${trsyncPath}",
+                        ]) {
+                            sshagent (credentials: [syncCredentials]) {
+                                sh(syncScript)
+                            }
                         }
                     }
-
                 }
             }
 
@@ -413,21 +417,25 @@ node('docker') {
                         workspace = common.getWorkspace()
                         def fh = new File("${workspace}/${file}".trim())
                         if (art) {
-                            buildSteps[fh.name.split('_')[0]] = artifactory.uploadPackageStep(
-                                art,
-                                "src/build/${fh.name}",
-                                properties,
-                                DIST,
-                                'main',
-                                timestamp
-                            )
+                            buildSteps[fh.name.split('_')[0]] = retry(publishRetryAttempts) {
+                                artifactory.uploadPackageStep(
+                                    art,
+                                    "src/build/${fh.name}",
+                                    properties,
+                                    DIST,
+                                    'main',
+                                    timestamp
+                                )
+                            }
                         } else {
-                            buildSteps[fh.name.split('_')[0]] = aptly.uploadPackageStep(
-                                "src/build/${fh.name}",
-                                APTLY_URL,
-                                aptlyRepo,
-                                true
-                            )
+                            buildSteps[fh.name.split('_')[0]] = retry(publishRetryAttempts) {
+                                aptly.uploadPackageStep(
+                                    "src/build/${fh.name}",
+                                    APTLY_URL,
+                                    aptlyRepo,
+                                    true
+                                )
+                            }
                         }
                     }
                     parallel buildSteps
@@ -435,8 +443,8 @@ node('docker') {
 
                 if (! art) {
                     stage("publish") {
-                        aptly.snapshotRepo(APTLY_URL, aptlyRepo, timestamp)
-                        aptly.publish(APTLY_URL)
+                        retry(publishRetryAttempts) { aptly.snapshotRepo(APTLY_URL, aptlyRepo, timestamp) }
+                        retry(publishRetryAttempts) { aptly.publish(APTLY_URL) }
                     }
                 }
             }
@@ -445,8 +453,8 @@ node('docker') {
         // upload only in case of non-experimental build (not triggered by gerrit)
         if (gerritProject == "" && UPLOAD_SOURCE_PACKAGE.toBoolean() == true) {
             stage("upload launchpad") {
-                debian.importGpgKey("launchpad-private")
-                debian.uploadPpa(PPA, "src/build/packages", "launchpad-private")
+                retry(publishRetryAttempts) { debian.importGpgKey("launchpad-private")}
+                retry(publishRetryAttempts) { debian.uploadPpa(PPA, "src/build/packages", "launchpad-private") }
             }
         }
     } catch (Throwable e) {
