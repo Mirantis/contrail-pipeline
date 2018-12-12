@@ -150,11 +150,13 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
 
     common.infoMsg('Perform client states to create new resources')
 
-    /*if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
-        salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client')
-    }*/
+    // temporary workaround for creating public network in case of contrail env
     salt.cmdRun(saltMaster, "ntw01*", 'salt-call contrail.virtual_network_create public ' +
-                                      '\'{"external":true,"ip_prefix":"172.16.111.0","ip_prefix_len":24,"asn":64512,"target":10000}\'')
+                                      '\'{"external":true,"ip_prefix":"10.16.0.0","ip_prefix_len":24,"asn":64512,"target":10000}\'')
+    if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
+        salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client', false, false)
+    }
+
     if (salt.testTarget(saltMaster, 'I@glance:client:enabled')) {
         salt.enforceState(saltMaster, 'I@glance:client:enabled', 'glance.client')
     }
@@ -317,9 +319,10 @@ timeout(time: 6, unit: 'HOURS') {
 
                     args = "\'-r ${test_pattern} -w ${test_concurrency}\'"
 
-                    if (salt.testTarget(saltMaster, 'I@runtest:salttest')) {
+                    // Skip this state in case of contrail env
+                    /*if (salt.testTarget(saltMaster, 'I@runtest:salttest')) {
                         salt.enforceState(saltMaster, 'I@runtest:salttest', ['runtest.salttest'], true)
-                    }
+                    }*/
 
                     if (salt.testTarget(saltMaster, 'I@runtest:tempest and cfg01*')) {
                         salt.enforceState(saltMaster, 'I@runtest:tempest and cfg01*', ['runtest'], true)
