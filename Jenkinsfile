@@ -463,6 +463,6 @@ node('docker') {
        throw e
     } finally {
        common.sendNotification(currentBuild.result,"",["slack"])
-       sh("rm -rf src")
+       sh("rm -rf src buildresult-*")
     }
 }
