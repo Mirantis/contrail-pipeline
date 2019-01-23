@@ -69,6 +69,7 @@ def runSteplerTests(master, dockerImageLink, target, testPattern='', logDir='/ho
                      "-v ${localKeystone}:${sourceFile} " +
                      "-v ${localLogDir}:${logDir} " +
                      '-v /etc/ssl/certs/:/etc/ssl/certs/ ' +
+                     '-v /etc/hosts:/etc/hosts ' +
                      "${dockerImageLink} > docker-stepler.log"
 
     salt.cmdRun(master, "${target}", "docker run --rm --net=host ${docker_run}")
@@ -180,12 +181,13 @@ def runTempestTestsNew(master, target, dockerImageLink, args = '', localLogDir='
                        tempestConfLocalPath='/root/test/tempest_generated.conf') {
     def salt = new com.mirantis.mk.Salt()
     salt.runSaltProcessStep(master, target, 'file.mkdir', ["${localLogDir}"])
-    salt.cmdRun(master, "${target}", 'docker run ' +
+    salt.cmdRun(master, "${target}", 'docker run --net=host ' +
                                     "-e ARGS=${args} " +
                                     "-v ${tempestConfLocalPath}:/etc/tempest/tempest.conf " +
                                     "-v ${localLogDir}:${logDir} " +
                                     '-v /etc/ssl/certs/:/etc/ssl/certs/ ' +
                                     '-v /tmp/:/tmp/ ' +
+                                    '-v /etc/hosts:/etc/hosts ' +
                                     "--rm ${dockerImageLink} " +
                                     '/bin/bash -c "run-tempest" ')
 }
