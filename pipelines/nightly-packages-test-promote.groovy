@@ -173,19 +173,25 @@ timeout(time: 8, unit: 'HOURS') {
             }
             // Perform smoke tests to fail early
             stage('Run tests'){
-                    build(job: stackTestJob, parameters: [
-                            string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
-                            string(name: 'TEST_CONF', value: testConf),
-                            string(name: 'TEST_TARGET', value: testTarget),
-                            string(name: 'TEST_CONCURRENCY', value: testConcurrency),
-                            string(name: 'TEST_PATTERN', value: testPattern),
-                            string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
-                            booleanParam(name: 'DELETE_STACK', value: false),
-                            booleanParam(name: 'TESTRAIL', value: true),
-                            booleanParam(name: 'FAIL_ON_TESTS', value: true),
-                        ],
-                        wait: true,
-                    )
+                testMilestone = "MCP1.1"
+                testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
+                testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
+                build(job: stackTestJob, parameters: [
+                        string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
+                        string(name: 'TEST_CONF', value: testConf),
+                        string(name: 'TEST_TARGET', value: testTarget),
+                        string(name: 'TEST_CONCURRENCY', value: testConcurrency),
+                        string(name: 'TEST_PATTERN', value: testPattern),
+                        string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
+                        booleanParam(name: 'DELETE_STACK', value: false),
+                        booleanParam(name: 'TESTRAIL', value: true),
+                        string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
+                        string(name: 'TEST_MODEL', value: "${testModel}"),
+                        string(name: 'TEST_PLAN', value: "${testPlan}"),
+                        booleanParam(name: 'FAIL_ON_TESTS', value: true),
+                    ],
+                    wait: true,
+                )
             }
             // Perform package promotion
             stage('Promote packages'){
