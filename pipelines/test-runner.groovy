@@ -261,8 +261,9 @@ timeout(time: 6, unit: 'HOURS') {
                 if (common.validInputParam('TEST_MILESTONE') && common.validInputParam('TEST_MODEL')) {
                     test_milestone = TEST_MILESTONE
                     test_model = TEST_MODEL
+                    test_plan = TEST_PLAN
                 } else {
-                    error('WHEN UPLOADING RESULTS TO TESTRAIL TEST_MILESTONE AND TEST_MODEL MUST BE SET')
+                    error('WHEN UPLOADING RESULTS TO TESTRAIL TEST_MILESTONE, TEST_MODEL AND TEST_PLAN MUST BE SET')
                 }
             }
 
@@ -363,6 +364,7 @@ timeout(time: 6, unit: 'HOURS') {
                     [$class: 'BooleanParameterValue', name: 'TESTRAIL', value: testrail.toBoolean()],
                     [$class: 'StringParameterValue', name: 'TEST_MILESTONE', value: test_milestone],
                     [$class: 'StringParameterValue', name: 'TEST_MODEL', value: test_model],
+                    [$class: 'StringParameterValue', name: 'TEST_PLAN', value: test_plan],
                     [$class: 'StringParameterValue', name: 'OPENSTACK_VERSION', value: openstack_version],
                     [$class: 'StringParameterValue', name: 'TEST_DATE', value: date],
                     [$class: 'StringParameterValue', name: 'TEST_PASS_THRESHOLD', value: TEST_PASS_THRESHOLD],
