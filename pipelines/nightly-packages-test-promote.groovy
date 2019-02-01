@@ -27,8 +27,7 @@ def testPattern = '^tungsten_tempest_plugin*|smoke'
 def openstackEnvironment = 'internal_cloud_v2_us'
 
 //promote parameters
-def aptlyPromoteJob = 'aptly-promote-all-nightly-testing'
-def mirrorsPromoteJob = 'pkg-promote'
+def mirrorsPromoteJob = 'pkg-promote-from-snapshot'
 
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 
@@ -195,27 +194,25 @@ timeout(time: 8, unit: 'HOURS') {
             }
             // Perform package promotion
             stage('Promote packages'){
-                parallel(
-                    promote_aptly: {
-                        build(job: aptlyPromoteJob, parameters: [
-                                string(name: 'COMPONENTS', value: "${linux_repo_contrail_component}"),
-                                string(name: 'PACKAGES', value: 'all'),
-                            ],
-                            wait: true,
-                        )
-                    },
-                    promote_mirrors: {
-                        build(job: mirrorsPromoteJob, parameters: [
-                                string(name: 'repoName', value: "opencontrail-${opencontrail_version}"),
-                                string(name: 'repoDist', value: "${linux_system_codename}"),
-                                string(name: 'promoteFrom', value: "nightly"),
-                                string(name: 'promoteTo', value: "testing"),
-                                string(name: 'packagesToPromote', value: "*"),
-                            ],
-                            wait: true,
-                        )
-                    },
-                )
+                if (OPENCONTRAIL_REPO_VERSION == 'nightly') {
+                    contrailRepoUrl = "http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${linux_system_codename}"
+                    packagesUrl = "${contrailRepoUrl}/dists/${linux_system_codename}/main/binary-${linux_system_architecture}/Packages"
+                    packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
+                    packageList = packages.split('\n').findAll { it =~ /^Package:/ }.collect { it.split(': ')[-1]}
+
+                    build(job: mirrorsPromoteJob, parameters: [
+                            string(name: 'repoUrl', value: "${contrailRepoUrl} ${linux_system_codename} main"),
+                            string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
+                            string(name: 'repoDist', value: "${linux_system_codename}"),
+                            string(name: 'packagesToPromote', value: packageList.join(' ')),
+                        ],
+                        propagate: false,
+                        wait: true,
+                    )
+                } else {
+                    common.warningMsg("Promotion skipped because OPENCONTRAIL_REPO_VERSION==${OPENCONTRAIL_REPO_VERSION}")
+                }
+
             }
         } catch (Exception e) {
             currentBuild.result = 'FAILURE'
