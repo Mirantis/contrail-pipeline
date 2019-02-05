@@ -175,7 +175,7 @@ timeout(time: 8, unit: 'HOURS') {
                 testMilestone = "MCP1.1"
                 testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
                 testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
-                build(job: stackTestJob, parameters: [
+                testBuild = build(job: stackTestJob, parameters: [
                         string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
                         string(name: 'TEST_CONF', value: testConf),
                         string(name: 'TEST_TARGET', value: testTarget),
@@ -200,7 +200,7 @@ timeout(time: 8, unit: 'HOURS') {
                     packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
                     packageList = packages.split('\n').findAll { it =~ /^Package:/ }.collect { it.split(': ')[-1]}
 
-                    build(job: mirrorsPromoteJob, parameters: [
+                    promotionBuild = build(job: mirrorsPromoteJob, parameters: [
                             string(name: 'repoUrl', value: "${contrailRepoUrl} ${linux_system_codename} main"),
                             string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
                             string(name: 'repoDist', value: "${linux_system_codename}"),
@@ -209,6 +209,9 @@ timeout(time: 8, unit: 'HOURS') {
                         propagate: false,
                         wait: true,
                     )
+                    if (promotionBuild.result != 'SUCCESS'){
+                        error('Failed to promote snapshot from nightly to testing repo.')
+                    }
                 } else {
                     common.warningMsg("Promotion skipped because OPENCONTRAIL_REPO_VERSION==${OPENCONTRAIL_REPO_VERSION}")
                 }
@@ -219,6 +222,7 @@ timeout(time: 8, unit: 'HOURS') {
             throw e
         } finally {
             if ( (currentBuild.result != 'FAILURE')
+                || (testBuild.result == 'SUCCESS')
                 || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
                     stage ("Delete stack") {
                         build(job: stackCleanupJob, parameters: [
