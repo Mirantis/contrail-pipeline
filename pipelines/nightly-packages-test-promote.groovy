@@ -198,7 +198,7 @@ timeout(time: 8, unit: 'HOURS') {
                     contrailRepoUrl = "http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${linux_system_codename}"
                     packagesUrl = "${contrailRepoUrl}/dists/${linux_system_codename}/main/binary-${linux_system_architecture}/Packages"
                     packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
-                    packageList = packages.split('\n').findAll { it =~ /^Package:/ }.collect { it.split(': ')[-1]}
+                    packageList = packages.split('\n').findAll { it =~ /^Package:(?:(?!ifmap-server).)+$/ }.collect { it.split(': ')[-1]}
 
                     promotionBuild = build(job: mirrorsPromoteJob, parameters: [
                             string(name: 'repoUrl', value: "${contrailRepoUrl} ${linux_system_codename} main"),
