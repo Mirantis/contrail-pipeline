@@ -151,9 +151,13 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
 
     common.infoMsg('Perform client states to create new resources')
 
-    // temporary workaround for creating public network in case of contrail env
+    // configure route target fot public network in case of contrail env
     salt.cmdRun(saltMaster, "ntw01*", 'salt-call contrail.virtual_network_create public ' +
-                                      '\'{"external":true,"ip_prefix":"10.16.0.0","ip_prefix_len":24,"asn":64512,"target":10000}\'')
+                                      'route_target_list=\'["target:64512:10000"]\'')
+
+    // Add route for public network in case of contrail env
+    salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1')
+
     if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
         salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client', false, false)
     }
