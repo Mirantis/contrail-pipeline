@@ -18,7 +18,7 @@ String openstack_credentials_id = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-dev
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 
 // test parameters
-def stackTestJob = 'ci-opencontrail-tempest-runner'
+def stackTestJob = 'ci-contrail-tempest-runner'
 def testConcurrency = '2'
 def testPassThreshold = '96'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
