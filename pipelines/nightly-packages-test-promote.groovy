@@ -85,8 +85,11 @@ timeout(time: 8, unit: 'HOURS') {
                 currentBuild.description = "${currentBuild.description}<br>${testContextName}"
 
 
-                // stackInstall priority (by descending): testContext, env.STACK_INSTALL, 'core,openstack,contrail'
-                //setContextDefault(testContext, 'stack_install', env.STACK_INSTALL ?: 'core,openstack,contrail')
+                // opencontrail_version priority (by descending): testContext, env.OPENCONTRAIL_VERSION, 'core,openstack,contrail'
+                setContextDefault(testContext, 'opencontrail_version', env.OPENCONTRAIL_VERSION ?: '4.1')
+                setContextDefault(testContext, 'mcp_version', env.MCP_VERSION ?: 'testing')
+                setContextDefault(testContext, 'openstack_enabled', (env.OPENSTACK_ENABLED == 'true' ? 'True' : 'False') ?: 'True')
+                setContextDefault(testContext, 'openstack_version', env.OPENSTACK_VERSION ?: 'queens')
 
                 def testContextYaml = contextsRootPath + '-context.yaml'
                 sh "rm -f $testContextYaml"
@@ -108,11 +111,9 @@ timeout(time: 8, unit: 'HOURS') {
             stage('Deploy the environment'){
 
                 build(job: 'create-mcp-env', parameters: [
-                        string(name: 'STACK_INSTALL', value: env.STACK_INSTALL),
                         string(name: 'STACK_NAME', value: stackName),
                         string(name: 'OS_AZ', value: "nova"),
                         string(name: 'OS_PROJECT_NAME', value: projectName),
-                        string(name: 'OPENCONTRAIL_VERSION', value: "${OPENCONTRAIL_VERSION}"),
                         textParam(name: 'COOKIECUTTER_EXTRA_CONTEXT', value: "${contextString}"),
                         booleanParam(name: 'DELETE_STACK', value: false),
                         booleanParam(name: 'RUN_TESTS', value: false),
@@ -121,6 +122,8 @@ timeout(time: 8, unit: 'HOURS') {
                         textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: "${clusterModelOverrides}"),
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
                         string(name: 'HEAT_TEMPLATES_REFSPEC', value: "refs/changes/31/34331/7"),
+                        textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
+                        textParam(name: 'EXTRA_REPOS', value: ""),
                     ],
                     wait: true,
                 )
