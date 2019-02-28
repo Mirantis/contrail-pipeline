@@ -81,15 +81,15 @@ timeout(time: 8, unit: 'HOURS') {
 
             stage('Getting test context'){
                 testContext = readYaml text: TEST_CONTEXT
-                testContextName = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}-${testContext.default_context.openstack_version}"
-                currentBuild.description = "${currentBuild.description}<br>${testContextName}"
-
 
                 // opencontrail_version priority (by descending): testContext, env.OPENCONTRAIL_VERSION, 'core,openstack,contrail'
                 setContextDefault(testContext, 'opencontrail_version', env.OPENCONTRAIL_VERSION ?: '4.1')
                 setContextDefault(testContext, 'mcp_version', env.MCP_VERSION ?: 'testing')
                 setContextDefault(testContext, 'openstack_enabled', (env.OPENSTACK_ENABLED == 'true' ? 'True' : 'False') ?: 'True')
                 setContextDefault(testContext, 'openstack_version', env.OPENSTACK_VERSION ?: 'queens')
+
+                testContextName = "oc${testContext.default_context.opencontrail_version.replaceAll(/\./, '')}-${testContext.default_context.openstack_version}"
+                currentBuild.description = "${currentBuild.description}<br>${testContextName}"
 
                 def testContextYaml = contextsRootPath + '-context.yaml'
                 sh "rm -f $testContextYaml"
