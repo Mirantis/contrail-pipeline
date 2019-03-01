@@ -450,13 +450,6 @@ node('docker') {
             }
         }
 
-        // upload only in case of non-experimental build (not triggered by gerrit)
-        if (gerritProject == "" && UPLOAD_SOURCE_PACKAGE.toBoolean() == true) {
-            stage("upload launchpad") {
-                retry(publishRetryAttempts) { debian.importGpgKey("launchpad-private")}
-                retry(publishRetryAttempts) { debian.uploadPpa(PPA, "src/build/packages", "launchpad-private") }
-            }
-        }
     } catch (Throwable e) {
        // If there was an exception thrown, the build failed
        currentBuild.result = "FAILURE"
