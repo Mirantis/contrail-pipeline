@@ -173,6 +173,14 @@ timeout(time: 8, unit: 'HOURS') {
                 linux_system_architecture = getPillarValues(saltMaster, 'I@salt:master', '_param:linux_system_architecture')
                 linux_system_codename = getPillarValues(saltMaster, 'I@salt:master', '_param:linux_system_codename')
             }
+            stage('Opencontrail controllers health check') {
+                try {
+                    salt.enforceState(pepperEnv, 'I@opencontrail:control or I@opencontrail:collector', 'opencontrail.upgrade.verify', true, true)
+                } catch (Exception er) {
+                    common.errorMsg("OpenContrail controllers health check stage found issues with services. Please take a look at the logs above.")
+                    throw er
+                }
+            }
             // Perform smoke tests to fail early
             stage('Run tests'){
                 testMilestone = "MCP1.1"
