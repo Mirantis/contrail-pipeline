@@ -409,44 +409,26 @@ node('docker') {
                 }
             }
 
-            lock("aptly-api") {
-                stage("upload") {
-                    buildSteps = [:]
-                    debFiles = sh script: "ls src/build/*.deb", returnStdout: true
-                    for (file in debFiles.tokenize()) {
-                        workspace = common.getWorkspace()
-                        def fh = new File("${workspace}/${file}".trim())
-                        if (art) {
-                            buildSteps[fh.name.split('_')[0]] = retry(publishRetryAttempts) {
-                                artifactory.uploadPackageStep(
-                                    art,
-                                    "src/build/${fh.name}",
-                                    properties,
-                                    DIST,
-                                    'main',
-                                    timestamp
-                                )
-                            }
-                        } else {
-                            buildSteps[fh.name.split('_')[0]] = retry(publishRetryAttempts) {
-                                aptly.uploadPackageStep(
-                                    "src/build/${fh.name}",
-                                    APTLY_URL,
-                                    aptlyRepo,
-                                    true
-                                )
-                            }
+            stage("upload") {
+                buildSteps = [:]
+                debFiles = sh script: "ls src/build/*.deb", returnStdout: true
+                for (file in debFiles.tokenize()) {
+                    workspace = common.getWorkspace()
+                    def fh = new File("${workspace}/${file}".trim())
+                    if (art) {
+                        buildSteps[fh.name.split('_')[0]] = retry(publishRetryAttempts) {
+                            artifactory.uploadPackageStep(
+                                art,
+                                "src/build/${fh.name}",
+                                properties,
+                                DIST,
+                                'main',
+                                timestamp
+                            )
                         }
                     }
-                    parallel buildSteps
                 }
-
-                if (! art) {
-                    stage("publish") {
-                        retry(publishRetryAttempts) { aptly.snapshotRepo(APTLY_URL, aptlyRepo, timestamp) }
-                        retry(publishRetryAttempts) { aptly.publish(APTLY_URL) }
-                    }
-                }
+                parallel buildSteps
             }
         }
 
