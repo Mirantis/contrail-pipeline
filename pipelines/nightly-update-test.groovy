@@ -12,7 +12,7 @@ git = new com.mirantis.mk.Git()
 openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 
-String projectName = 'networking-team'
+String projectName = 'networking-ci-team'
 String gerritCredentialsId = env.GERRIT_CREDENTIALS_ID ?: 'gerrit'
 String openstack_credentials_id = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
