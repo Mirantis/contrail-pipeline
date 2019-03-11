@@ -11,6 +11,7 @@ common = new com.mirantis.mk.Common()
 git = new com.mirantis.mk.Git()
 openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
+python = new com.mirantis.mk.Python()
 
 String projectName = 'networking-ci-team'
 String gerritCredentialsId = env.GERRIT_CREDENTIALS_ID ?: 'gerrit'
@@ -25,10 +26,11 @@ def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
 def testPattern = '^tungsten_tempest_plugin*|smoke'
 def openstackEnvironment = 'internal_cloud_v2_us'
+def testResult
 
 //promote parameters
 def mirrorsPromoteJob = 'pkg-promote-from-snapshot'
-
+def pepperEnv = "pepperEnv"
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 
 
@@ -174,6 +176,7 @@ timeout(time: 8, unit: 'HOURS') {
                 linux_system_codename = getPillarValues(saltMaster, 'I@salt:master', '_param:linux_system_codename')
             }
             stage('Opencontrail controllers health check') {
+                python.setupPepperVirtualenv(pepperEnv, saltMasterUrl, saltMasterCredentials)
                 try {
                     salt.enforceState(pepperEnv, 'I@opencontrail:control or I@opencontrail:collector', 'opencontrail.upgrade.verify', true, true)
                 } catch (Exception er) {
@@ -202,6 +205,9 @@ timeout(time: 8, unit: 'HOURS') {
                     ],
                     wait: true,
                 )
+
+                testResult = testBuild.result
+
             }
             // Perform package promotion
             stage('Promote packages'){
@@ -233,7 +239,7 @@ timeout(time: 8, unit: 'HOURS') {
             throw e
         } finally {
             if ( (currentBuild.result != 'FAILURE')
-                || (testBuild.result == 'SUCCESS')
+                || (testResult == 'SUCCESS')
                 || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
                     stage ("Delete stack") {
                         build(job: stackCleanupJob, parameters: [
