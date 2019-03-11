@@ -5,8 +5,7 @@
  * Expected parameters:
  *
  * MCP_VERSION              MCP version for initial environment deployment
- * OPENSTACK_VERSION        Openstack version for initial environment deployment
- * OPENCONTRAIL_VERSION     OpenContrail version for initial environment deployment
+ * CONTEXT_NAME             Name of the context for initial deployment
  * DELETE_STACK_ON_FAILURE  delete stack after failed deployment
  */
 
@@ -24,7 +23,7 @@ def testConcurrency = '2'
 def testPassThreshold = '96'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
-def testPattern = '^tungsten_tempest_plugin*|smoke'
+def testPattern = 'smoke'
 def testResult
 
 def openstackEnvironment = 'internal_cloud_v2_us'
@@ -59,7 +58,7 @@ timeout(time: 8, unit: 'HOURS') {
                                ],
                     ])
 
-                    testContextString = readFile "context/${MCP_VERSION}-os-${OPENSTACK_VERSION}-oc${OPENCONTRAIL_VERSION}-cicd.yaml"
+                    testContextString = readFile "context/${MCP_VERSION}-${CONTEXT_NAME}-cicd.yaml"
                     testContextYaml = readYaml text: testContextString
 
                 }
@@ -120,10 +119,10 @@ timeout(time: 8, unit: 'HOURS') {
                     env.OS_CLOUD = openstackEnvironment
 
                     // create openstack env
-                    openstack = 'set +x; venv/bin/openstack '
+                    openstackCmd = 'set +x; venv/bin/openstack '
                     sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
                     // get salt master host ip
-                    saltMasterHost = sh(script: "$openstack stack show -f value -c outputs ${stackName} | jq -r .[0].output_value", returnStdout: true).trim()
+                    saltMasterHost = sh(script: "${openstackCmd} stack show -f value -c outputs ${stackName} | jq -r .[0].output_value", returnStdout: true).trim()
                 }
 
                 currentBuild.description = "${currentBuild.description}<br>${saltMasterHost}"
@@ -134,7 +133,7 @@ timeout(time: 8, unit: 'HOURS') {
             // Perform smoke tests to fail early
             stage('Run tests'){
                 testMilestone = "MCP1.1"
-                testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
+                testModel = "cookied_oc${testContextYaml.default.opencontrail_version.replaceAll(/\./, '')}"
                 testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
                 testBuild = build(job: stackTestJob, parameters: [
                         string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
