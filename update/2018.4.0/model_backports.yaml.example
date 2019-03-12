@@ -1,0 +1,16 @@
+37021:
+    source: 'gerrit'
+    level: 'system'
+    apply: False
+37023:
+    source: 'gerrit'
+    level: 'system'
+    apply: True
+    target: 'I@keystone:server'
+    single_node: True
+    state: 'keystone.client.server'
+    excludes: ''
+37024:
+    source: 'gerrit'
+    level: 'system'
+    apply: False

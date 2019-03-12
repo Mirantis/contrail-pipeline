@@ -11,11 +11,24 @@
 
 
 common = new com.mirantis.mk.Common()
+gerrit = new com.mirantis.mk.Gerrit()
 openstack = new com.mirantis.mk.Openstack()
+salt = new com.mirantis.mk.Salt()
 
 String projectName = 'networking-ci-team'
 String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
+String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 String saltMasterUrl
+
+// gerrit variables
+def gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
+def gerritName = env.GERRIT_NAME ?: 'mcp-jenkins'
+def gerritHost = env.GERRIT_HOST ?: 'gerrit.mcp.mirantis.com'
+def gerritProtocol = 'https'
+
+// ssh variables
+String sshUser = 'mcp-scale-jenkins'
+String sshOpt = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
@@ -28,6 +41,8 @@ def testResult
 
 def openstackEnvironment = 'internal_cloud_v2_us'
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
+
+def modelBackports
 
 
 timeout(time: 8, unit: 'HOURS') {
@@ -43,24 +58,30 @@ timeout(time: 8, unit: 'HOURS') {
                 }
                 currentBuild.description = "${stackName}"
                 contextsRootPath = WORKSPACE + '/' + JOB_NAME
+
+                dir("${workspace}/contrail/contrail-pipeline") {
+                    checkout([ $class: 'GitSCM',
+                               branches: [ [name: 'FETCH_HEAD'], ],
+                               userRemoteConfigs: [
+                                       [url: 'ssh://gerrit.mcp.mirantis.com:29418/contrail/contrail-pipeline',
+                                        refspec: 'master',
+                                        credentialsId: 'gerrit'],
+                               ],
+                    ])
+
+                    if (fileExists("update/${MCP_VERSION}/model_backports.yaml")) {
+                        modelBackports = readYaml file: "update/${MCP_VERSION}/model_backports.yaml"
+                    }
+                }
+
             }
 
             stage('Getting test context'){
 
                 // checkout contrail/contrail-pipeline repository
                 dir("${workspace}/contrail/contrail-pipeline") {
-                    checkout([ $class: 'GitSCM',
-                               branches: [ [name: 'FETCH_HEAD'], ],
-                               userRemoteConfigs: [
-                                       [url: 'ssh://gerrit.mcp.mirantis.com:29418/contrail/contrail-pipeline',
-                                        refspec: 'develop',
-                                        credentialsId: 'gerrit'],
-                               ],
-                    ])
-
                     testContextString = readFile "context/${MCP_VERSION}-${CONTEXT_NAME}-cicd.yaml"
                     testContextYaml = readYaml text: testContextString
-
                 }
 
                 testContextName = "oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}-${testContextYaml.default_context.openstack_version}"
@@ -128,6 +149,61 @@ timeout(time: 8, unit: 'HOURS') {
                 currentBuild.description = "${currentBuild.description}<br>${saltMasterHost}"
                 saltMasterUrl = "http://${saltMasterHost}:6969"
                 common.infoMsg("Salt API is accessible via ${saltMasterUrl}")
+
+                // get connection parameters for deployed salt master
+                saltMaster = salt.connection(saltMasterUrl, saltMasterCredentials)
+            }
+
+            if (modelBackports) {
+                stage('Apply patches for environment testing and update functionality') {
+
+                    def systemRepo = 'salt-models/reclass-system'
+                    def clusterRepo = 'mk/cookiecutter-templates'
+
+                    dir("${workspace}/contrail/contrail-pipeline") {
+                        sshagent (credentials: [sshUser]) {
+                            sh "scp ${sshOpt} -r update/${MCP_VERSION}/patches ${sshUser}@${saltMasterHost}:/tmp"
+                        }
+                    }
+
+                    for (change in modelBackports.keySet()) {
+                        if (modelBackports[change].source == 'gerrit') {
+                            def gerritChange = gerrit.getGerritChange(gerritName, gerritHost, change, gerritCredentials, true)
+
+                            if (modelBackports[change].level == 'system') {
+                                println("Change into reclass-system has been defined from gerrit: ${change}")
+                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/system && git fetch ${gerritProtocol}://${gerritHost}/${systemRepo} ${gerritChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD")
+                            } else if (modelBackports[change].level == 'cluster') {
+                                println("Change into cluster model has been found and will be applied: #${change}")
+                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/cluster/${stackName} && git fetch ${gerritProtocol}://${gerritHost}/${clusterRepo} ${gerritChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD")
+
+                            }
+
+                        } else if (modelBackports[change].source == 'patch') {
+                            if (modelBackports[change].level == 'system') {
+                                println("Change into reclass-system has been defined as patch: ${change}.patch")
+                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/system && git am < /tmp/patches/${change}.patch")
+                            } else if (modelBackports[change].level == 'cluster') {
+                                println("Change into cluster model has been defined as patch: ${change}.patch")
+                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/cluster/${stackName} && git am < /tmp/patches/${change}.patch")
+                            }
+                        }
+
+                        if (modelBackports[change].apply == true) {
+                            def target = modelBackports[change].single_node ? salt.getFirstMinion(saltMaster, modelBackports[change].target) : modelBackports[change].target
+                            salt.syncAll(saltMaster, target)
+
+                            if (modelBackports[change].excludes) {
+                                salt.enforceStateWithExclude([saltId: saltMaster, target: "${target}", state: modelBackports[change].state, excludedStates: modelBackports[change].excludes])
+                            } else {
+                                salt.enforceState([saltId: saltMaster, target: "${target}", state: modelBackports[change].state])
+                            }
+                        }
+
+                    }
+
+                }
+
             }
 
             // Perform smoke tests to fail early
