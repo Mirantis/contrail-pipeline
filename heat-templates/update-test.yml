@@ -1,0 +1,210 @@
+heat_template_version: 2017-02-24
+
+parameters:
+  project_id:
+    type: string
+  pub_net_id:
+    type: string
+  flavor_id:
+    type: string
+  image_id:
+    type: string
+  keypair_name:
+    type: string
+    default: test-workloads-keypair
+  secgroup_name:
+    type: string
+    default: test-workloads-secgroup
+  project_net_name:
+    type: string
+    default: test-workloads-project-net
+  project_subnet_name:
+    type: string
+    default: test-workloads-project-subnet
+  project_subnet_cidr:
+      type: string
+      default: 192.168.3.0/24
+  project_subnet_gateway:
+      type: string
+      default: 192.168.3.1
+  project_router_name:
+    type: string
+    default: test-workloads-router
+  instance1_name:
+      type: string
+      default: instance1
+  instance2_name:
+      type: string
+      default: instance2
+  instance3_name:
+      type: string
+      default: instance3
+  instance4_name:
+      type: string
+      default: instance4
+
+resources:
+
+  project_net:
+    type: OS::Neutron::Net
+    properties:
+      tenant_id: { get_param: project_id }
+      name: { get_param: project_net_name }
+
+  project_subnet:
+    type: OS::Neutron::Subnet
+    properties:
+      tenant_id: { get_param: project_id }
+      name: { get_param: project_subnet_name }
+      network_id: { get_resource: project_net }
+      #      allocation_pools:
+      #        - start: "192.168.0.100"
+      #          end: "192.168.0.254"
+      cidr: { get_param: project_subnet_cidr }
+      enable_dhcp: True
+      gateway_ip: { get_param: project_subnet_gateway }
+
+  project_router:
+    type: OS::Neutron::Router
+    properties:
+      name: { get_param: project_router_name }
+      external_gateway_info:
+        network: { get_param: pub_net_id }
+      value_specs:
+        tenant_id: { get_param: project_id }
+
+
+  project_router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: project_router }
+      subnet_id: { get_resource: project_subnet }
+
+  secgroup:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: { get_param: secgroup_name }
+      description: ICMP and all IP ports
+      rules:
+        - protocol: icmp
+          remote_ip_prefix: 0.0.0.0/0
+        - protocol: tcp
+          port_range_min: 1
+          port_range_max: 65535
+          remote_ip_prefix: 0.0.0.0/0
+
+  instance1:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: instance1_name }
+      flavor: { get_param: flavor_id }
+      image: { get_param: image_id }
+      key_name: { get_param: keypair_name }
+      networks:
+        - port: { get_resource: instance1_port }
+
+  instance1_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: project_net }
+      fixed_ips:
+        - subnet_id: { get_resource: project_subnet }
+      security_groups: [{ get_resource: secgroup }]
+
+      #  instance1_floating_ip:
+      #    type: OS::Neutron::FloatingIP
+      #    properties:
+      #      floating_network: { get_param: pub_net_id }
+      #
+      #  instance1_floating_ip_associate:
+      #    type: OS::Neutron::FloatingIPAssociation
+      #    properties:
+      #      floatingip_id: { get_resource: instance1_floating_ip }
+      #      port_id: { get_resource: instance1_port }
+
+  instance2:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: instance2_name }
+      flavor: { get_param: flavor_id }
+      image: { get_param: image_id }
+      key_name: { get_param: keypair_name }
+      networks:
+        - port: { get_resource: instance2_port }
+
+  instance2_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: project_net }
+      fixed_ips:
+        - subnet_id: { get_resource: project_subnet }
+      security_groups: [{ get_resource: secgroup }]
+
+      #  instance2_floating_ip:
+      #    type: OS::Neutron::FloatingIP
+      #    properties:
+      #      floating_network: { get_param: pub_net_id }
+      #
+      #  instance2_floating_ip_associate:
+      #    type: OS::Neutron::FloatingIPAssociation
+      #    properties:
+      #      floatingip_id: { get_resource: instance2_floating_ip }
+      #      port_id: { get_resource: instance2_port }
+
+  instance3:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: instance3_name }
+      flavor: { get_param: flavor_id }
+      image: { get_param: image_id }
+      key_name: { get_param: keypair_name }
+      networks:
+        - port: { get_resource: instance3_port }
+
+  instance3_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: project_net }
+      fixed_ips:
+        - subnet_id: { get_resource: project_subnet }
+      security_groups: [{ get_resource: secgroup }]
+
+      #  instance3_floating_ip:
+      #    type: OS::Neutron::FloatingIP
+      #    properties:
+      #      floating_network: { get_param: pub_net_id }
+      #
+      #  instance3_floating_ip_associate:
+      #    type: OS::Neutron::FloatingIPAssociation
+      #    properties:
+      #      floatingip_id: { get_resource: instance3_floating_ip }
+      #      port_id: { get_resource: instance3_port }
+
+  instance4:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: instance4_name }
+      flavor: { get_param: flavor_id }
+      image: { get_param: image_id }
+      key_name: { get_param: keypair_name }
+      networks:
+        - port: { get_resource: instance4_port }
+
+  instance4_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: project_net }
+      fixed_ips:
+        - subnet_id: { get_resource: project_subnet }
+      security_groups: [{ get_resource: secgroup }]
+
+      #  instance4_floating_ip:
+      #    type: OS::Neutron::FloatingIP
+      #    properties:
+      #      floating_network: { get_param: pub_net_id }
+      #
+      #  instance4_floating_ip_associate:
+      #    type: OS::Neutron::FloatingIPAssociation
+      #    properties:
+      #      floatingip_id: { get_resource: instance4_floating_ip }
+      #      port_id: { get_resource: instance4_port }
