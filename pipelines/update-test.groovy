@@ -209,7 +209,7 @@ timeout(time: 8, unit: 'HOURS') {
             // Perform smoke tests to fail early
             stage('Run tests'){
                 testMilestone = "MCP1.1"
-                testModel = "cookied_oc${testContextYaml.default.opencontrail_version.replaceAll(/\./, '')}"
+                testModel = "cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}"
                 testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
                 testBuild = build(job: stackTestJob, parameters: [
                         string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
