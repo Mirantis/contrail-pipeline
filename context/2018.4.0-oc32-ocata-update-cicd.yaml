@@ -302,7 +302,7 @@ default_context:
   openstack_ovs_encapsulation_type: vxlan
   # For tempest tests which require access to public api
   openstack_proxy_vip_interface: ens6
-  openstack_proxy_address: 10.13.250.9
+  openstack_proxy_address: 10.13.0.80
   openstack_proxy_hostname: prx
   openstack_proxy_node01_address: 10.11.0.81
   openstack_proxy_node01_hostname: prx01
@@ -319,8 +319,8 @@ default_context:
   openstack_create_public_network: 'True'
   openstack_public_neutron_subnet_gateway: 10.13.0.1
   openstack_public_neutron_subnet_cidr: 10.13.0.0/16
-  openstack_public_neutron_subnet_allocation_start: 10.13.250.10
-  openstack_public_neutron_subnet_allocation_end: 10.13.254.254
+  openstack_public_neutron_subnet_allocation_start: 10.13.128.0
+  openstack_public_neutron_subnet_allocation_end: 10.13.255.254
   k8s_keepalived_vip_vrid: 69
   k8s_api_insecure_bind: 'True'
   kubernetes_keepalived_vip_interface: ens3
