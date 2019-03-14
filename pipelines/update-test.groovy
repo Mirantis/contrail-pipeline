@@ -7,6 +7,7 @@
  * MCP_VERSION              MCP version for initial environment deployment
  * CONTEXT_NAME             Name of the context for initial deployment
  * DELETE_STACK_ON_FAILURE  delete stack after failed deployment
+ * CP_REFSPEC               ref for contrail-pipeline repository
  */
 
 
@@ -64,7 +65,7 @@ timeout(time: 8, unit: 'HOURS') {
                                branches: [ [name: 'FETCH_HEAD'], ],
                                userRemoteConfigs: [
                                        [url: 'ssh://gerrit.mcp.mirantis.com:29418/contrail/contrail-pipeline',
-                                        refspec: 'master',
+                                        refspec: CP_REFSPEC ?: 'master',
                                         credentialsId: 'gerrit'],
                                ],
                     ])
