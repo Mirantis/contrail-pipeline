@@ -1,0 +1,25 @@
+From 019cc3bc37f8c5d32edd580a0d3b848eb12d26bb Mon Sep 17 00:00:00 2001
+From: jenkins-slave <jenkins@localhost>
+Date: Thu, 21 Mar 2019 10:18:26 +0000
+Subject: [PATCH] Switch jenkins pipelines branch to release/<mcp_release>
+
+---
+ infra/init.yml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/infra/init.yml b/infra/init.yml
+index ae8e79d..8f3d4e9 100644
+--- a/infra/init.yml
++++ b/infra/init.yml
+@@ -38,7 +38,7 @@ parameters:
+     infra_kvm_node03_hostname: kvm03
+     infra_maas_node01_deploy_address: ${_param:infra_config_deploy_address}
+     infra_maas_node01_hostname: ${_param:infra_config_hostname}
+-    jenkins_pipelines_branch: ${_param:apt_mk_version}
++    jenkins_pipelines_branch: release/${_param:apt_mk_version}
+     linux_dhcp_interface:
+       enabled: true
+       proto: dhcp
+-- 
+2.7.4
+
