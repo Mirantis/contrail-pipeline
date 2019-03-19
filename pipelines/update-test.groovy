@@ -21,10 +21,10 @@ String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentia
 String saltMasterUrl
 
 // gerrit variables
-def gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
-def gerritName = env.GERRIT_NAME ?: 'mcp-jenkins'
-def gerritHost = env.GERRIT_HOST ?: 'gerrit.mcp.mirantis.com'
-def gerritProtocol = 'https'
+gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
+gerritName = env.GERRIT_NAME ?: 'mcp-jenkins'
+gerritHost = env.GERRIT_HOST ?: 'gerrit.mcp.mirantis.com'
+gerritProtocol = 'https'
 
 // ssh variables
 String sshUser = 'mcp-scale-jenkins'
@@ -43,6 +43,47 @@ def openstackEnvironment = 'internal_cloud_v2_us'
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 
 def modelBackports
+def updateChanges
+
+
+def applyModelChanges(saltMaster, stackName, changesInfo, patchDir='/tmp/patches') {
+
+    String systemRepo = 'salt-models/reclass-system'
+
+    for (change in changesInfo.keySet()) {
+        if (changesInfo[change].source == 'gerrit') {
+            def gerritChange = gerrit.getGerritChange(gerritName, gerritHost, change, gerritCredentials, true)
+
+            if (changesInfo[change].level == 'system') {
+                println("Change into reclass-system has been defined from gerrit: ${change}")
+                salt.cmdRun(saltMaster, 'I@salt:master', "cd /srv/salt/reclass/classes/system && git fetch ${gerritProtocol}://${gerritHost}/${systemRepo} ${gerritChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD")
+            } else {
+                println("WARNING: gerrit change can be applied only for system model level ! Ignoring ${change} change")
+            }
+
+        } else if (changesInfo[change].source == 'patch') {
+            if (changesInfo[change].level == 'system') {
+                println("Change into reclass-system has been defined as patch: ${change}.patch")
+                salt.cmdRun(saltMaster, 'I@salt:master', "cd /srv/salt/reclass/classes/system && git am ${patchDir}/${change}.patch")
+            } else if (changesInfo[change].level == 'cluster') {
+                println("Change into cluster model has been defined as patch: ${change}.patch")
+                salt.cmdRun(saltMaster, 'I@salt:master', "cd /srv/salt/reclass/ && git am --directory classes/cluster/${stackName} ${patchDir}/${change}.patch")
+            }
+        }
+
+        if (changesInfo[change].apply == true) {
+            def target = changesInfo[change].single_node ? salt.getFirstMinion(saltMaster, changesInfo[change].target) : changesInfo[change].target
+            salt.syncAll(saltMaster, target)
+
+            if (changesInfo[change].excludes) {
+                salt.enforceStateWithExclude([saltId: saltMaster, target: "${target}", state: changesInfo[change].state, excludedStates: changesInfo[change].excludes])
+            } else {
+                salt.enforceState([saltId: saltMaster, target: "${target}", state: changesInfo[change].state])
+            }
+        }
+
+    }
+}
 
 
 timeout(time: 8, unit: 'HOURS') {
@@ -72,11 +113,18 @@ timeout(time: 8, unit: 'HOURS') {
                     if (fileExists("update/${MCP_VERSION}/model_backports.yaml")) {
                         modelBackports = readYaml file: "update/${MCP_VERSION}/model_backports.yaml"
                     }
+
+                    // update changes are required for update procedure
+                    if (fileExists("update/${MCP_VERSION}/update_changes.yaml")) {
+                        updateChanges = readYaml file: "update/${MCP_VERSION}/update_changes.yaml"
+                    } else {
+                        throw new RuntimeException("Update changes file is missing: update/${MCP_VERSION}/update_changes.yaml")
+                    }
                 }
 
             }
 
-            stage('Getting test context'){
+            stage('Getting test context') {
 
                 // checkout contrail/contrail-pipeline repository
                 dir("${workspace}/contrail/contrail-pipeline") {
@@ -91,7 +139,7 @@ timeout(time: 8, unit: 'HOURS') {
                 common.infoMsg(testContextString)
             }
 
-            stage('Deploy the environment'){
+            stage('Deploy the environment') {
 
                 build(job: 'create-mcp-env', parameters: [
                         string(name: 'STACK_NAME', value: stackName),
@@ -112,7 +160,7 @@ timeout(time: 8, unit: 'HOURS') {
                 )
             }
 
-            stage('Get environment information'){
+            stage('Get environment information') {
 
                 // checkout mcp-env/pipelines repository
                 dir("${workspace}/mcp-env/pipelines") {
@@ -152,62 +200,33 @@ timeout(time: 8, unit: 'HOURS') {
 
                 // get connection parameters for deployed salt master
                 saltMaster = salt.connection(saltMasterUrl, saltMasterCredentials)
+
+                // Upload patches on salt master node
+                dir("${workspace}/contrail/contrail-pipeline") {
+                    sshagent (credentials: [sshUser]) {
+                        sh "scp ${sshOpt} -r update/${MCP_VERSION}/patches ${sshUser}@${saltMasterHost}:/tmp"
+                    }
+                }
             }
 
             if (modelBackports) {
                 stage('Apply patches for environment testing and update functionality') {
 
-                    def systemRepo = 'salt-models/reclass-system'
-                    def clusterRepo = 'mk/cookiecutter-templates'
+                    applyModelChanges(saltMaster, stackName, modelBackports)
 
-                    dir("${workspace}/contrail/contrail-pipeline") {
-                        sshagent (credentials: [sshUser]) {
-                            sh "scp ${sshOpt} -r update/${MCP_VERSION}/patches ${sshUser}@${saltMasterHost}:/tmp"
-                        }
+                    try {
+                        println("INFO: Verification of cluster model with model backports ...")
+                        salt.cmdRun(saltMaster, 'I@salt:master', "reclass -iy")
+                    } catch (Exception e) {
+                        common.errorMsg('Can not validate current Reclass cluster model with applied model backports')
+                        throw e
                     }
-
-                    for (change in modelBackports.keySet()) {
-                        if (modelBackports[change].source == 'gerrit') {
-                            def gerritChange = gerrit.getGerritChange(gerritName, gerritHost, change, gerritCredentials, true)
-
-                            if (modelBackports[change].level == 'system') {
-                                println("Change into reclass-system has been defined from gerrit: ${change}")
-                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/system && git fetch ${gerritProtocol}://${gerritHost}/${systemRepo} ${gerritChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD")
-                            } else if (modelBackports[change].level == 'cluster') {
-                                println("Change into cluster model has been found and will be applied: #${change}")
-                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/cluster/${stackName} && git fetch ${gerritProtocol}://${gerritHost}/${clusterRepo} ${gerritChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD")
-
-                            }
-
-                        } else if (modelBackports[change].source == 'patch') {
-                            if (modelBackports[change].level == 'system') {
-                                println("Change into reclass-system has been defined as patch: ${change}.patch")
-                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/system && git am < /tmp/patches/${change}.patch")
-                            } else if (modelBackports[change].level == 'cluster') {
-                                println("Change into cluster model has been defined as patch: ${change}.patch")
-                                salt.cmdRun(saltMaster, 'cfg01.*', "cd /srv/salt/reclass/classes/cluster/${stackName} && git am < /tmp/patches/${change}.patch")
-                            }
-                        }
-
-                        if (modelBackports[change].apply == true) {
-                            def target = modelBackports[change].single_node ? salt.getFirstMinion(saltMaster, modelBackports[change].target) : modelBackports[change].target
-                            salt.syncAll(saltMaster, target)
-
-                            if (modelBackports[change].excludes) {
-                                salt.enforceStateWithExclude([saltId: saltMaster, target: "${target}", state: modelBackports[change].state, excludedStates: modelBackports[change].excludes])
-                            } else {
-                                salt.enforceState([saltId: saltMaster, target: "${target}", state: modelBackports[change].state])
-                            }
-                        }
-
-                    }
-
                 }
 
             }
 
             // Perform smoke tests to fail early
-            stage('Run tests'){
+            stage('Run tests') {
                 testMilestone = "MCP1.1"
                 testModel = "cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}"
                 testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
@@ -229,6 +248,19 @@ timeout(time: 8, unit: 'HOURS') {
                 )
 
                 testResult = testBuild.result
+            }
+
+            stage('Prepare environment for update') {
+
+                applyModelChanges(saltMaster, stackName, updateChanges)
+
+                try {
+                    println("INFO: Verification of cluster model with update changes ...")
+                    salt.cmdRun(saltMaster, 'I@salt:master', "reclass -iy")
+                } catch (Exception e) {
+                    common.errorMsg('Can not validate current Reclass cluster model with applied update changes')
+                    throw e
+                }
             }
         } catch (Exception e) {
             currentBuild.result = 'FAILURE'
