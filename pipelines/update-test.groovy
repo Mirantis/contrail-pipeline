@@ -21,6 +21,8 @@ String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcl
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 String saltMasterUrl
 
+def cpRefSpec = env.CP_REFSPEC ?: 'master'
+
 // gerrit variables
 def gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
 def gerritName = env.GERRIT_NAME ?: 'mcp-jenkins'
@@ -65,7 +67,7 @@ timeout(time: 8, unit: 'HOURS') {
                                branches: [ [name: 'FETCH_HEAD'], ],
                                userRemoteConfigs: [
                                        [url: 'ssh://gerrit.mcp.mirantis.com:29418/contrail/contrail-pipeline',
-                                        refspec: CP_REFSPEC ?: 'master',
+                                        refspec: cpRefSpec,
                                         credentialsId: 'gerrit'],
                                ],
                     ])
