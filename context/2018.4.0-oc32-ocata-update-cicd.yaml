@@ -1,7 +1,7 @@
 default_context:
   openssh_groups: "networking"
   cookiecutter_template_url: ssh://gerrit.mcp.mirantis.com:29418/mk/cookiecutter-templates.git
-  cookiecutter_template_branch: 'refs/changes/90/37190/4'
+  cookiecutter_template_branch: 'refs/changes/90/37190/5'
   shared_reclass_url: https://gerrit.mcp.mirantis.com/salt-models/reclass-system.git
   shared_reclass_branch: 'refs/changes/24/37024/2'
   mcp_version: '2018.4.0'

@@ -96,7 +96,7 @@ def getPillarValues(saltMaster, target, pillar) {
  * @param logDir            directory to put tempest log files
  **/
 
-def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir, concurrency=2) {
+def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir, concurrency=2, mcpVersion='nightly') {
     // Set up test_target parameter on node level
     def fullnodename = salt.getMinions(saltMaster, nodeName).get(0)
     def saltMasterExpression = 'I@salt:master'
@@ -129,14 +129,24 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
         result = salt.cmdRun(saltMaster, 'I@keystone:server and *01*', '. /root/keystonercv3; openstack network list --external | grep ID')
         salt.checkResult(result)
     } catch (Exception e) {
-        classes_to_add.add('service.runtest.tempest.public_net')
-        if (!getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_public_neutron_subnet_gateway')) {
-            if (getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_gateway_node01_external_address')) {
-                params_to_update['openstack_public_neutron_subnet_gateway'] = '${_param:openstack_gateway_node01_external_address}'
-            } else {
-                common.warningMsg('Cannot determine neutron public network gateway')
-            }
-        }
+        if (mcpVersion == '2018.4.0'){
+            classes_to_add.add('system.neutron.client.service.contrail_public')
+            classes_to_add.add('system.keystone.client.core')
+            def cluster_name = salt.getReturnValues(salt.getPillar(saltMaster, 'I@salt:master', '_param:cluster_name'))
+            // Some parameters aren't supported in runtest formula in 2018.4.0, so we should add them through custom class
+            classes_to_add.add("cluster.${cluster_name}.openstack.scale-ci-patch.runtest")
+            params_to_update['openstack_public_neutron_subnet_gateway'] = '10.13.0.1'
+            params_to_update['openstack_public_neutron_subnet_cidr'] = '10.13.0.0/16'
+            params_to_update['openstack_public_neutron_subnet_allocation_start'] = '10.13.128.0'
+            params_to_update['openstack_public_neutron_subnet_allocation_end'] = '10.13.255.254'
+        } else {
+            classes_to_add.add('service.runtest.tempest.public_net')
+            if (!getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_public_neutron_subnet_gateway')) {
+                if (getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_gateway_node01_external_address')) {
+                    params_to_update['openstack_public_neutron_subnet_gateway'] = '${_param:openstack_gateway_node01_external_address}'
+                } else {
+                    common.warningMsg('Cannot determine neutron public network gateway')
+                }
     }
 
     result = salt.runSaltCommand(saltMaster, 'local', saltMasterTarget, 'reclass.node_update', null, null, ['name': "${fullnodename}", 'classes': classes_to_add, 'parameters': params_to_update])
@@ -284,7 +294,9 @@ timeout(time: 6, unit: 'HOURS') {
                 }
             }
 
-            configureRuntestNode(saltMaster, 'cfg01*', TEST_TARGET, reports_dir, log_dir, test_concurrency.toInteger())
+            def mcpVersion = salt.getReturnValues(salt.getPillar(saltMaster, 'I@salt:master', '_param:mcp_version')) ?: salt.getReturnValues(salt.getPillar(saltMaster, 'I@salt:master', '_param:apt_mk_version'))
+
+            configureRuntestNode(saltMaster, 'cfg01*', TEST_TARGET, reports_dir, log_dir, test_concurrency.toInteger(), mcpVersion)
 
             salt.runSaltProcessStep(saltMaster, TEST_TARGET, 'file.remove', ["${reports_dir}"])
             salt.runSaltProcessStep(saltMaster, TEST_TARGET, 'file.mkdir', ["${reports_dir}"])
