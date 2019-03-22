@@ -1,0 +1,8 @@
+oc_update_repo:
+    source: 'patch'
+    level: 'system'
+    apply: False
+oc_update_cluster_model_changes:
+    level: 'cluster'
+    source: 'patch'
+    apply: False

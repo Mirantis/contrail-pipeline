@@ -1,0 +1,90 @@
+From ba59574d2e62f53e44927fb4fc566a8c59de2b15 Mon Sep 17 00:00:00 2001
+From: jenkins-slave <jenkins@localhost>
+Date: Mon, 18 Mar 2019 08:27:19 +0000
+Subject: [PATCH] Cluster model changes for oc update
+
+---
+ infra/init.yml             | 3 +++
+ opencontrail/analytics.yml | 1 +
+ opencontrail/compute.yml   | 1 +
+ opencontrail/control.yml   | 1 +
+ openstack/control.yml      | 1 +
+ openstack/upgrade.yml      | 1 +
+ 6 files changed, 8 insertions(+)
+
+diff --git a/infra/init.yml b/infra/init.yml
+index f702ce3..7a2bce3 100644
+--- a/infra/init.yml
++++ b/infra/init.yml
+@@ -52,6 +52,9 @@ parameters:
+       netmask: ${_param:control_network_netmask}
+       proto: static
+       type: eth
++    linux_system_architecture: amd64
++    linux_system_repo_update_opencontrail_url: http://mirror.mirantis.com/nightly/opencontrail-3.2/
++    linux_system_repo_update_opencontrail_version: 3.2
+     linux_system_user_sudo: true
+     openstack_version: ocata
+     salt_control_trusty_image: http://images.mirantis.com/ubuntu-14-04-x64-mcp${_param:apt_mk_version}.qcow2
+diff --git a/opencontrail/analytics.yml b/opencontrail/analytics.yml
+index e9ebfc7..baf676e 100644
+--- a/opencontrail/analytics.yml
++++ b/opencontrail/analytics.yml
+@@ -2,6 +2,7 @@ classes:
+ - service.haproxy.proxy.single
+ - system.linux.system.repo.mcp.extra
+ - system.linux.system.repo.mcp.contrail
++- system.linux.system.repo.mcp.apt_mirantis.update.contrail
+ - system.linux.system.repo.mcp.apt_mirantis.openstack
+ - system.linux.system.repo.mcp.apt_mirantis.ubuntu
+ - system.linux.system.repo.mcp.apt_mirantis.saltstack_2016_3
+diff --git a/opencontrail/compute.yml b/opencontrail/compute.yml
+index 4aa5959..32ccba5 100644
+--- a/opencontrail/compute.yml
++++ b/opencontrail/compute.yml
+@@ -1,5 +1,6 @@
+ classes:
+ - system.linux.system.repo.mcp.contrail
++- system.linux.system.repo.mcp.apt_mirantis.update.contrail
+ - system.opencontrail.compute.cluster
+ - system.opencontrail.client.cluster
+ - system.opencontrail.client.resource.virtual_router
+diff --git a/opencontrail/control.yml b/opencontrail/control.yml
+index 11acd88..5da7da3 100644
+--- a/opencontrail/control.yml
++++ b/opencontrail/control.yml
+@@ -1,6 +1,7 @@
+ classes:
+ - service.haproxy.proxy.single
+ - system.linux.system.repo.mcp.contrail
++- system.linux.system.repo.mcp.apt_mirantis.update.contrail
+ - system.linux.system.repo.mcp.extra
+ - system.linux.system.repo.mcp.apt_mirantis.openstack
+ - system.linux.system.repo.mcp.apt_mirantis.ubuntu
+diff --git a/openstack/control.yml b/openstack/control.yml
+index a937e3c..a359a14 100644
+--- a/openstack/control.yml
++++ b/openstack/control.yml
+@@ -5,6 +5,7 @@ classes:
+ - system.linux.system.repo.mcp.apt_mirantis.saltstack_2016_3
+ - system.linux.system.repo.mcp.apt_mirantis.glusterfs
+ - system.linux.system.repo.mcp.contrail
++- system.linux.system.repo.mcp.apt_mirantis.update.contrail
+ - system.memcached.server.single
+ - system.neutron.control.opencontrail.cluster
+ - system.opencontrail.client.cluster
+diff --git a/openstack/upgrade.yml b/openstack/upgrade.yml
+index e357563..a9e600e 100644
+--- a/openstack/upgrade.yml
++++ b/openstack/upgrade.yml
+@@ -4,6 +4,7 @@ classes:
+ - system.linux.system.repo.mcp.apt_mirantis.ubuntu
+ - system.linux.system.repo.mcp.apt_mirantis.saltstack_2016_3
+ - system.linux.system.repo.mcp.contrail
++- system.linux.system.repo.mcp.apt_mirantis.update.contrail
+ - system.memcached.server.single
+ - system.heat.server.single
+ - system.keystone.server.single
+-- 
+2.7.4
+

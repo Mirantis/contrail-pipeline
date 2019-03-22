@@ -1,0 +1,32 @@
+From f1bd0bf9e628ef4cb369d7d9337fb31df080cf35 Mon Sep 17 00:00:00 2001
+From: Maxim Rasskazov <mrasskazov@mirantis.com>
+Date: Thu, 6 Dec 2018 20:02:37 +0400
+Subject: [PATCH] Add Opencontrail update repository class
+
+---
+ linux/system/repo/mcp/apt_mirantis/update/contrail.yml | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 linux/system/repo/mcp/apt_mirantis/update/contrail.yml
+
+diff --git a/linux/system/repo/mcp/apt_mirantis/update/contrail.yml b/linux/system/repo/mcp/apt_mirantis/update/contrail.yml
+new file mode 100644
+index 0000000..c5fd347
+--- /dev/null
++++ b/linux/system/repo/mcp/apt_mirantis/update/contrail.yml
+@@ -0,0 +1,13 @@
++parameters:
++  linux:
++    system:
++      repo:
++        mcp_opencontrail_update:
++          source: "deb ${_param:linux_system_repo_update_opencontrail_url}/${_param:linux_system_codename} ${_param:linux_system_codename} main"
++          architectures: ${_param:linux_system_architecture}
++          key_url: "${_param:linux_system_repo_update_opencontrail_url}/${_param:linux_system_codename}/archive-opencontrail-${_param:linux_system_repo_update_opencontrail_version}.key"
++          clean_file: true
++          pin:
++          - pin: 'release a=${_param:linux_system_codename}'
++            priority: 1100
++            package: '*'
+-- 
+2.7.4
+
