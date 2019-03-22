@@ -46,6 +46,7 @@ def openstackEnvironment = 'internal_cloud_v2_us'
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 
 def modelBackports
+def pipelineChangesMap = ['2018.4.0': ['mk/mk-pipelines': ['37681']]]
 def updateChanges
 
 
@@ -264,6 +265,40 @@ timeout(time: 8, unit: 'HOURS') {
                     common.errorMsg('Can not validate current Reclass cluster model with applied update changes')
                     throw e
                 }
+            }
+
+            stage('Update deployed environment') {
+
+                def pipelineChanges = pipelineChangesMap.get(MCP_VERSION)
+
+                def cicdGerritUrl = salt.getReturnValues(salt.getPillar(saltMaster, "I@gerrit:client", "_param:jenkins_gerrit_url"))
+
+                if (pipelineChanges) {
+                    for (repo in pipelineChanges.keySet()) {
+                        if (pipelineChanges.get(repo)) {
+                            salt.cmdRun(saltMaster, 'I@salt:master', "rm -rf /tmp/pipeline_repo && mkdir /tmp/pipeline_repo && cd /tmp/pipeline_repo && " +
+                                    "git init && git remote add origin ${cicdGerritUrl}/${repo} && git fetch && git checkout release/${MCP_VERSION}")
+
+                            for (change in pipelineChanges.get(repo)) {
+                                def pipelineChange = gerrit.getGerritChange(gerritName, gerritHost, change, gerritCredentials, true)
+                                salt.cmdRun(saltMaster, 'I@salt:master', "cd /tmp/pipeline_repo && git fetch ${gerritProtocol}://${gerritHost}/${repo} " +
+                                        "${pipelineChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD && git push origin release/${MCP_VERSION}")
+                            }
+                        }
+                    }
+                }
+
+                // trigger update pipeline against OpenContrail VCP (control & analytic nodes)
+                build(job: 'run-job-on-cluster-jenkins', parameters: [
+                        string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
+                        string(name: 'OS_PROJECT_NAME', value: projectName),
+                        string(name: 'REFSPEC', value: 'stable'),
+                        string(name: 'STACK_NAME', value: stackName),
+                        string(name: 'JOB_NAME', value: 'deploy-upgrade-opencontrail'),
+                        booleanParam(name: 'SWITCH_TO_MASTER', value: false),
+                        string(name: 'JOB_PARAMS', value: "STAGE_CONTROLLERS_UPGRADE=true,STAGE_ANALYTICS_UPGRADE=true,STAGE_COMPUTES_UPGRADE=true," +
+                                "STAGE_CONTROLLERS_ROLLBACK=false,STAGE_ANALYTICS_ROLLBACK=false,STAGE_COMPUTES_ROLLBACK=false,ASK_CONFIRMATION=false")
+                ])
             }
         } catch (Exception e) {
             currentBuild.result = 'FAILURE'

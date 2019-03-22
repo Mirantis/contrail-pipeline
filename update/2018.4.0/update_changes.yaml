@@ -6,3 +6,14 @@ oc_update_cluster_model_changes:
     level: 'cluster'
     source: 'patch'
     apply: False
+37677:
+    source: 'gerrit'
+    level: 'system'
+    apply: False
+set_update_branch_for_pipelines:
+    level: 'cluster'
+    source: 'patch'
+    apply: True
+    target: 'I@jenkins:client'
+    state: 'jenkins.client'
+    excludes: ''
