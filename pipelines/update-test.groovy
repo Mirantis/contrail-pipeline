@@ -154,7 +154,7 @@ timeout(time: 8, unit: 'HOURS') {
                         booleanParam(name: 'RUN_TESTS', value: false),
                         booleanParam(name: 'RUN_CVP', value: false),
                         booleanParam(name: 'COLLECT_LOGS', value: true),
-                        textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: ""),
+                        textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: env.CLUSTER_MODEL_OVERRIDES ?: ""),
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
                         string(name: 'HEAT_TEMPLATES_REFSPEC', value: "refs/changes/31/34331/10"),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
