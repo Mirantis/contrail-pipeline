@@ -277,12 +277,15 @@ timeout(time: 8, unit: 'HOURS') {
                     for (repo in pipelineChanges.keySet()) {
                         if (pipelineChanges.get(repo)) {
                             salt.cmdRun(saltMaster, 'I@salt:master', "rm -rf /tmp/pipeline_repo && mkdir /tmp/pipeline_repo && cd /tmp/pipeline_repo && " +
-                                    "git init && git remote add origin ${cicdGerritUrl}/${repo} && git fetch && git checkout release/${MCP_VERSION}")
+                                    "git init && git remote add origin ${cicdGerritUrl}/${repo} && " +
+                                    "GIT_SSH_COMMAND=\"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" " +
+                                    "git fetch && git checkout release/${MCP_VERSION}")
 
                             for (change in pipelineChanges.get(repo)) {
                                 def pipelineChange = gerrit.getGerritChange(gerritName, gerritHost, change, gerritCredentials, true)
                                 salt.cmdRun(saltMaster, 'I@salt:master', "cd /tmp/pipeline_repo && git fetch ${gerritProtocol}://${gerritHost}/${repo} " +
-                                        "${pipelineChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD && git push origin release/${MCP_VERSION}")
+                                        "${pipelineChange.currentPatchSet.ref} && git cherry-pick FETCH_HEAD && " +
+                                        "GIT_SSH_COMMAND=\"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no\" git push origin release/${MCP_VERSION}")
                             }
                         }
                     }
