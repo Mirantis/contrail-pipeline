@@ -147,6 +147,8 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
                 } else {
                     common.warningMsg('Cannot determine neutron public network gateway')
                 }
+            }
+        }
     }
 
     result = salt.runSaltCommand(saltMaster, 'local', saltMasterTarget, 'reclass.node_update', null, null, ['name': "${fullnodename}", 'classes': classes_to_add, 'parameters': params_to_update])
@@ -394,4 +396,3 @@ timeout(time: 6, unit: 'HOURS') {
         }
     }
 }
-
