@@ -206,6 +206,13 @@ timeout(time: 8, unit: 'HOURS') {
                 saltMaster = salt.connection(saltMasterUrl, saltMasterCredentials)
             }
 
+            stage('Apply required fixes') {
+                println("INFO: Apply fix for PROD-28573")
+                salt.cmdRun(saltMaster, 'I@salt:master', "sed -i 's/#cpu_model=<None>/cpu_model = {{ compute.libvirt.cpu_model }}/g' " +
+                        "/srv/salt/env/prd/nova/files/ocata/nova-compute.conf.Debian")
+                salt.enforceState(saltMaster, 'I@nova:compute', 'nova.compute')
+            }
+
             stage('Upload data to env') {
                 // Upload patches on salt master node
                 dir("${workspace}/contrail/contrail-pipeline") {
