@@ -16,7 +16,7 @@ gerrit = new com.mirantis.mk.Gerrit()
 openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 
-String projectName = 'networking-ci-team'
+String projectName
 String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 String saltMasterUrl
@@ -97,8 +97,10 @@ timeout(time: 8, unit: 'HOURS') {
                 wrap([$class: 'BuildUser']) {
                     if (env.BUILD_USER_ID) {
                         stackName = "${env.BUILD_USER_ID}-${JOB_NAME}-${BUILD_NUMBER}"
+                        projectName = 'networking-team'
                     } else {
                         stackName = "jenkins-${JOB_NAME}-${BUILD_NUMBER}"
+                        projectName = 'networking-ci-team'
                     }
                 }
                 currentBuild.description = "${stackName}"
