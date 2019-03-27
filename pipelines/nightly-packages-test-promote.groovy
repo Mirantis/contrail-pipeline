@@ -8,15 +8,21 @@
 import static groovy.json.JsonOutput.toJson
 
 common = new com.mirantis.mk.Common()
+gerrit = new com.mirantis.mk.Gerrit()
 git = new com.mirantis.mk.Git()
 openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 python = new com.mirantis.mk.Python()
 
 String projectName
-String gerritCredentialsId = env.GERRIT_CREDENTIALS_ID ?: 'gerrit'
 String openstack_credentials_id = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
+
+// gerrit variables
+gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
+gerritName = env.GERRIT_NAME ?: 'mcp-jenkins'
+gerritHost = env.GERRIT_HOST ?: 'gerrit.mcp.mirantis.com'
+gerritProtocol = 'https'
 
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
@@ -114,6 +120,7 @@ timeout(time: 8, unit: 'HOURS') {
 
             stage('Deploy the environment'){
 
+                heatTemplatesChange = gerrit.getGerritChange(gerritName, gerritHost, '34331', gerritCredentials, true)
                 build(job: 'create-mcp-env', parameters: [
                         string(name: 'STACK_NAME', value: stackName),
                         string(name: 'OS_AZ', value: "nova"),
@@ -125,7 +132,7 @@ timeout(time: 8, unit: 'HOURS') {
                         booleanParam(name: 'COLLECT_LOGS', value: true),
                         textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: "${clusterModelOverrides}"),
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
-                        string(name: 'HEAT_TEMPLATES_REFSPEC', value: "refs/changes/31/34331/12"),
+                        string(name: 'HEAT_TEMPLATES_REFSPEC', value: "${heatTemplatesChange.currentPatchSet.ref}"),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
                         textParam(name: 'EXTRA_REPOS', value: ""),
                     ],
