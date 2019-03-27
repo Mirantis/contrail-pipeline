@@ -1,0 +1,10 @@
+# Backports into reclass model
+
+# fix for non-working contrail-snmp-collector, which prevents passing update pipeline
+37759:
+    source: 'gerrit'
+    level: 'system'
+    apply: True
+    target: 'I@opencontrail:collector'
+    state: 'opencontrail'
+    excludes: ''

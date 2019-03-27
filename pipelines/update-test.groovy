@@ -48,6 +48,9 @@ def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 def modelBackports
 def pipelineChangesMap = ['2018.4.0': ['mk/mk-pipelines': ['37681']]]
 def updateChanges
+def ocSaltFormulaPkg = 'salt-formula-opencontrail'
+def reviewReposBaseUrl = "http://seed01-bud.infra.mirantis.net/mcp/review"
+def saltFormulaReview = '37487'
 
 
 def applyModelChanges(saltMaster, stackName, changesInfo, patchDir='/tmp/patches') {
@@ -234,6 +237,20 @@ timeout(time: 8, unit: 'HOURS') {
             if (modelBackports) {
                 stage('Apply patches for environment testing and update functionality') {
 
+                    // Update salt-formula pkg if we have needed backports on review
+                    if (saltFormulaReview) {
+
+                        def saltFormulaRepoUrl = "${reviewReposBaseUrl}/${saltFormulaReview}/salt-formulas/xenial/"
+                        salt.cmdRun(saltMaster, 'I@salt:master',
+                                "echo \"deb [arch=amd64] ${saltFormulaRepoUrl} xenial main\" > /etc/apt/sources.list.d/salt_formula_review.list " +
+                                        "&& apt-key adv --fetch-keys ${saltFormulaRepoUrl}/archive-salt-formulas.key")
+
+                        salt.cmdRun(saltMaster, 'I@salt:master', "echo \"Package: *\nPin: release l=salt-formulas-nightly\nPin-Priority: 1100\" > " +
+                                "/etc/apt/preferences.d/salt_formula_review")
+
+                        salt.cmdRun(saltMaster, 'I@salt:master', "apt-get update && apt-get --only-upgrade install ${ocSaltFormulaPkg}")
+                    }
+
                     applyModelChanges(saltMaster, stackName, modelBackports)
 
                     try {
@@ -273,6 +290,7 @@ timeout(time: 8, unit: 'HOURS') {
             }
 
             stage('Prepare environment for update') {
+
 
                 applyModelChanges(saltMaster, stackName, updateChanges)
 
