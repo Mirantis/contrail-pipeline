@@ -204,13 +204,21 @@ timeout(time: 8, unit: 'HOURS') {
 
                 // get connection parameters for deployed salt master
                 saltMaster = salt.connection(saltMasterUrl, saltMasterCredentials)
+            }
 
+            stage('Upload data to env') {
                 // Upload patches on salt master node
                 dir("${workspace}/contrail/contrail-pipeline") {
                     sshagent (credentials: [sshUser]) {
                         sh "scp ${sshOpt} -r update/${MCP_VERSION}/patches ${sshUser}@${saltMasterHost}:/tmp"
+                        sh "scp ${sshOpt} scripts/create-workloads.sh heat-templates/update-test.yml ${sshUser}@${saltMasterHost}:/tmp"
                     }
                 }
+            }
+
+            stage('Creating workloads') {
+                salt.cmdRun(saltMaster, 'cfg01.*', " salt-cp 'ctl01.*' /tmp/create-workloads.sh /tmp/update-test.yml /root/")
+                salt.cmdRun(saltMaster, 'I@nova:controller and *01.*', "cd /root && chmod +x create-workloads.sh && ./create-workloads.sh")
             }
 
             if (modelBackports) {
@@ -303,6 +311,7 @@ timeout(time: 8, unit: 'HOURS') {
                                 "STAGE_CONTROLLERS_ROLLBACK=false,STAGE_ANALYTICS_ROLLBACK=false,STAGE_COMPUTES_ROLLBACK=false,ASK_CONFIRMATION=false")
                 ])
             }
+
         } catch (Exception e) {
             currentBuild.result = 'FAILURE'
             throw e
