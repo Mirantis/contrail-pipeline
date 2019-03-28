@@ -212,13 +212,6 @@ timeout(time: 8, unit: 'HOURS') {
                 saltMaster = salt.connection(saltMasterUrl, saltMasterCredentials)
             }
 
-            stage('Apply required fixes') {
-                println("INFO: Apply fix for PROD-28573")
-                salt.cmdRun(saltMaster, 'I@salt:master', "sed -i 's/#cpu_model=<None>/cpu_model = {{ compute.libvirt.cpu_model }}/g' " +
-                        "/srv/salt/env/prd/nova/files/ocata/nova-compute.conf.Debian")
-                salt.enforceState(saltMaster, 'I@nova:compute', 'nova.compute')
-            }
-
             stage('Upload data to env') {
                 // Upload patches on salt master node
                 dir("${workspace}/contrail/contrail-pipeline") {
@@ -227,11 +220,6 @@ timeout(time: 8, unit: 'HOURS') {
                         sh "scp ${sshOpt} scripts/create-workloads.sh heat-templates/update-test.yml ${sshUser}@${saltMasterHost}:/tmp"
                     }
                 }
-            }
-
-            stage('Creating workloads') {
-                salt.cmdRun(saltMaster, 'cfg01.*', " salt-cp 'ctl01.*' /tmp/create-workloads.sh /tmp/update-test.yml /root/")
-                salt.cmdRun(saltMaster, 'I@nova:controller and *01.*', "cd /root && chmod +x create-workloads.sh && ./create-workloads.sh")
             }
 
             if (modelBackports) {
@@ -264,6 +252,15 @@ timeout(time: 8, unit: 'HOURS') {
 
             }
 
+            stage('Apply required fixes') {
+                println("INFO: Apply fix for PROD-28573")
+                salt.cmdRun(saltMaster, 'I@salt:master', "sed -i 's/'host-passthrough'/'custom'/g' " +
+                        "/srv/salt/env/prd/nova/files/ocata/nova-compute.conf.Debian")
+                salt.cmdRun(saltMaster, 'I@salt:master', "sed -i 's/#cpu_model=<None>/cpu_model=IvyBridge/g' " +
+                        "/srv/salt/env/prd/nova/files/ocata/nova-compute.conf.Debian")
+                salt.enforceState(saltMaster, 'I@nova:compute', 'nova.compute')
+            }
+
             // Perform smoke tests to fail early
             stage('Run tests') {
                 testMilestone = "MCP1.1"
@@ -287,6 +284,11 @@ timeout(time: 8, unit: 'HOURS') {
                 )
 
                 testResult = testBuild.result
+            }
+
+            stage('Creating workloads') {
+                salt.cmdRun(saltMaster, 'cfg01.*', " salt-cp 'ctl01.*' /tmp/create-workloads.sh /tmp/update-test.yml /root/")
+                salt.cmdRun(saltMaster, 'I@nova:controller and *01.*', "cd /root && chmod +x create-workloads.sh && ./create-workloads.sh")
             }
 
             stage('Prepare environment for update') {
