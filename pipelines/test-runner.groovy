@@ -125,30 +125,16 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
         classes_to_add.add('service.runtest.tempest.services.manila.glance')
     }
 
-    try {
-        result = salt.cmdRun(saltMaster, 'I@keystone:server and *01*', '. /root/keystonercv3; openstack network list --external | grep ID')
-        salt.checkResult(result)
-    } catch (Exception e) {
-        if (mcpVersion == '2018.4.0'){
-            classes_to_add.add('system.neutron.client.service.contrail_public')
-            classes_to_add.add('system.keystone.client.core')
-            def cluster_name = salt.getReturnValues(salt.getPillar(saltMaster, 'I@salt:master', '_param:cluster_name'))
-            // Some parameters aren't supported in runtest formula in 2018.4.0, so we should add them through custom class
-            classes_to_add.add("cluster.${cluster_name}.openstack.scale-ci-patch.runtest")
-            params_to_update['openstack_public_neutron_subnet_gateway'] = '10.13.0.1'
-            params_to_update['openstack_public_neutron_subnet_cidr'] = '10.13.0.0/16'
-            params_to_update['openstack_public_neutron_subnet_allocation_start'] = '10.13.128.0'
-            params_to_update['openstack_public_neutron_subnet_allocation_end'] = '10.13.255.254'
-        } else {
-            classes_to_add.add('service.runtest.tempest.public_net')
-            if (!getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_public_neutron_subnet_gateway')) {
-                if (getPillarValues(saltMaster, saltMasterExpression, '_param:openstack_gateway_node01_external_address')) {
-                    params_to_update['openstack_public_neutron_subnet_gateway'] = '${_param:openstack_gateway_node01_external_address}'
-                } else {
-                    common.warningMsg('Cannot determine neutron public network gateway')
-                }
-            }
-        }
+    if (mcpVersion == '2018.4.0'){
+        classes_to_add.add('system.neutron.client.service.contrail_public')
+        classes_to_add.add('system.keystone.client.core')
+        def cluster_name = salt.getReturnValues(salt.getPillar(saltMaster, 'I@salt:master', '_param:cluster_name'))
+        // Some parameters aren't supported in runtest formula in 2018.4.0, so we should add them through custom class
+        classes_to_add.add("cluster.${cluster_name}.openstack.scale-ci-patch.runtest")
+        params_to_update['openstack_public_neutron_subnet_gateway'] = '10.13.0.1'
+        params_to_update['openstack_public_neutron_subnet_cidr'] = '10.13.0.0/16'
+        params_to_update['openstack_public_neutron_subnet_allocation_start'] = '10.13.128.0'
+        params_to_update['openstack_public_neutron_subnet_allocation_end'] = '10.13.255.254'
     }
 
     result = salt.runSaltCommand(saltMaster, 'local', saltMasterTarget, 'reclass.node_update', null, null, ['name': "${fullnodename}", 'classes': classes_to_add, 'parameters': params_to_update])
@@ -163,16 +149,16 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
 
     common.infoMsg('Perform client states to create new resources')
 
-    // configure route target fot public network in case of contrail env
-    salt.cmdRun(saltMaster, "ntw01*", 'salt-call contrail.virtual_network_create public ' +
-                                      'route_target_list=\'["target:64512:10000"]\'')
-
     // Add route for public network in case of contrail env
     salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1')
 
     if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
-        salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client', false, false)
+        salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client')
     }
+
+    // configure route target fot public network in case of contrail env
+    salt.cmdRun(saltMaster, "ntw01*", 'salt-call contrail.virtual_network_create public ' +
+            'route_target_list=\'["target:64512:10000"]\'')
 
     if (salt.testTarget(saltMaster, 'I@glance:client:enabled')) {
         salt.enforceState(saltMaster, 'I@glance:client:enabled', 'glance.client')
