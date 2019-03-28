@@ -50,7 +50,7 @@ def pipelineChangesMap = ['2018.4.0': ['mk/mk-pipelines': ['37681']]]
 def updateChanges
 def ocSaltFormulaPkg = 'salt-formula-opencontrail'
 def reviewReposBaseUrl = "http://seed01-bud.infra.mirantis.net/mcp/review"
-def saltFormulaReview = '37487'
+def saltFormulaReview = '38159'
 
 
 def applyModelChanges(saltMaster, stackName, changesInfo, patchDir='/tmp/patches') {
