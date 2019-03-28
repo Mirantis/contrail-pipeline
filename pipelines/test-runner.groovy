@@ -152,8 +152,8 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
     // Add route for public network in case of contrail env
     salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1')
 
-    if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
-        salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client')
+    if (salt.testTarget(saltMaster, 'I@neutron:client:enabled and cfg01*')) {
+        salt.enforceState(saltMaster, 'I@neutron:client:enabled and cfg01*', 'neutron.client')
     }
 
     // configure route target fot public network in case of contrail env
@@ -342,6 +342,26 @@ timeout(time: 6, unit: 'HOURS') {
                         }
                     } else {
                         common.warningMsg('Cannot generate tempest config by runtest salt')
+                    }
+
+                    if (mcpVersion == '2018.4.0'){
+                        def tempestCfgDir = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_dir'))
+                        def tempestCfgName = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_name'))
+                        def tempestCfgPath = tempestCfgDir + tempestCfgName
+
+                        def addTempestConf = 'contrail = True\\n' +
+                                '\\n' +
+                                '[patrole]\\n' +
+                                'custom_policy_files = /etc/opencontrail/policy.json\\n' +
+                                'enable_rbac = False\\n' +
+                                '\\n' +
+                                '[sdn]\\n' +
+                                'service_name = opencontrail\\n' +
+                                'endpoint_type = internal\\n' +
+                                'catalog_type = contrail\\n' +
+                                'contrail_version = 3.2'
+                        salt.cmdRun(saltMaster, 'I@runtest:tempest and cfg01*', "echo '${addTempestConf}' >> ${tempestCfgPath}")
+                        salt.cmdRun(saltMaster, 'I@runtest:tempest and cfg01*', "sed -i 's/\\[auth\\]/\\[auth]\\ntempest_roles = admin/g' ${tempestCfgPath}")
                     }
 
                     runTempestTestsNew(saltMaster, TEST_TARGET, test_image, args)
