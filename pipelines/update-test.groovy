@@ -161,7 +161,7 @@ timeout(time: 8, unit: 'HOURS') {
                         booleanParam(name: 'RUN_TESTS', value: false),
                         booleanParam(name: 'RUN_CVP', value: false),
                         booleanParam(name: 'COLLECT_LOGS', value: true),
-                        textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: env.CLUSTER_MODEL_OVERRIDES ?: "${pipelineLibChanges.currentPatchSet.ref}"),
+                        textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: env.CLUSTER_MODEL_OVERRIDES ?: "parameters.jenkins.client.lib.pipeline-library.branch e7476fe3bfeb8b927c56f23c9b6f6c7e1409f071 infra/config.yml"),
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
                         string(name: 'HEAT_TEMPLATES_REFSPEC', value: "${heatTemplatesChange.currentPatchSet.ref}"),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
