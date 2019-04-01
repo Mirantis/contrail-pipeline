@@ -19,3 +19,11 @@ set_update_branch_for_pipelines:
     target: 'I@jenkins:client'
     state: 'jenkins.client'
     excludes: ''
+# fix for calling update pipeline on CICD jenkins behind HaProxy
+23475:
+    level: 'system'
+    source: 'gerrit'
+    apply: True
+    target: 'cid*'
+    state: 'haproxy.proxy'
+    excludes: ''
