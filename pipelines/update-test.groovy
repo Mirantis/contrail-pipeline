@@ -36,10 +36,12 @@ String sshOpt = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
 def testConcurrency = '2'
-def testPassThreshold = '96'
+def testPassThreshold = '86'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
-def testPattern = 'smoke'
+def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
+        '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
+        '|^tempest.api.object_storage*'
 def testResult
 
 def openstackEnvironment = 'internal_cloud_v2_us'
@@ -262,28 +264,27 @@ timeout(time: 8, unit: 'HOURS') {
                 salt.enforceState(saltMaster, 'I@nova:compute', 'nova.compute')
             }
 
-            // Perform smoke tests to fail early
-            stage('Run tests') {
-                testMilestone = "MCP1.1"
-                testModel = "cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}"
-                testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
-                testBuild = build(job: stackTestJob, parameters: [
-                        string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
-                        string(name: 'TEST_CONF', value: testConf),
-                        string(name: 'TEST_TARGET', value: testTarget),
-                        string(name: 'TEST_CONCURRENCY', value: testConcurrency),
-                        string(name: 'TEST_PATTERN', value: testPattern),
-                        string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
-                        booleanParam(name: 'DELETE_STACK', value: false),
-                        booleanParam(name: 'TESTRAIL', value: false),
-                        string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
-                        string(name: 'TEST_MODEL', value: "${testModel}"),
-                        string(name: 'TEST_PLAN', value: "${testPlan}"),
-                        booleanParam(name: 'FAIL_ON_TESTS', value: true),
-                ],
+            def testMilestone = "MCP1.1"
+            def testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
+            def testBuildParams = [
+                    string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
+                    string(name: 'TEST_CONF', value: testConf),
+                    string(name: 'TEST_TARGET', value: testTarget),
+                    string(name: 'TEST_CONCURRENCY', value: testConcurrency),
+                    string(name: 'TEST_PATTERN', value: testPattern),
+                    string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
+                    booleanParam(name: 'DELETE_STACK', value: false),
+                    booleanParam(name: 'TESTRAIL', value: true),
+                    string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
+                    string(name: 'TEST_PLAN', value: "${testPlan}"),
+                    booleanParam(name: 'FAIL_ON_TESTS', value: true),
+            ]
+            // Perform smoke tests against initial env
+            stage('Run tests against initial env') {
+                def testModel = "initial_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}"
+                testBuild = build(job: stackTestJob, parameters: testBuildParams + string(name: 'TEST_MODEL', value: "${testModel}"),
                         wait: true,
                 )
-
                 testResult = testBuild.result
             }
 
@@ -341,6 +342,15 @@ timeout(time: 8, unit: 'HOURS') {
                         string(name: 'JOB_PARAMS', value: "STAGE_CONTROLLERS_UPGRADE=true,STAGE_ANALYTICS_UPGRADE=true,STAGE_COMPUTES_UPGRADE=true," +
                                 "STAGE_CONTROLLERS_ROLLBACK=false,STAGE_ANALYTICS_ROLLBACK=false,STAGE_COMPUTES_ROLLBACK=false,ASK_CONFIRMATION=false")
                 ])
+            }
+
+            // Perform smoke tests against updated environment
+            stage('Run tests against updated env') {
+                testModel = "updated_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}"
+                testBuild = build(job: stackTestJob, parameters: testBuildParams + string(name: 'TEST_MODEL', value: "${testModel}"),
+                        wait: true,
+                )
+                testResult = testBuild.result
             }
 
         } catch (Exception e) {
