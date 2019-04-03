@@ -115,7 +115,9 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
     def params_to_update = ['tempest_test_target': testTarget,
                             'runtest_tempest_cfg_dir': tempestCfgDir,
                             'runtest_tempest_log_file': "${logDir}/tempest.log",
-                            'runtest_tempest_concurrency': concurrency,]
+                            'runtest_tempest_concurrency': concurrency,
+                            'glance_image_cirros_location': 'https://artifactory.mcp.mirantis.net/artifactory/test-images/cirros-0.3.5-x86_64-disk.img',
+                            'glance_image_fedora_location': 'https://artifactory.mcp.mirantis.net/artifactory/test-images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2',]
 
     if (salt.testTarget(saltMaster, 'I@nova:controller:barbican:enabled:true')){
         classes_to_add.add('service.runtest.tempest.barbican')
