@@ -154,10 +154,13 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
     // Add route for public network in case of contrail env
     salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1')
 
-    if (salt.testTarget(saltMaster, 'I@neutron:client:enabled and cfg01*')) {
-        salt.enforceState(saltMaster, 'I@neutron:client:enabled and cfg01*', 'neutron.client')
+    if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
+        if (mcpVersion == '2018.4.0') {
+            salt.enforceState(saltMaster, 'I@neutron:client:enabled and cfg01*', 'neutron.client')
+        } else {
+            salt.enforceState(saltMaster, 'I@neutron:client:enabled', 'neutron.client')
+        }
     }
-
     // configure route target fot public network in case of contrail env
     salt.cmdRun(saltMaster, "ntw01*", 'salt-call contrail.virtual_network_create public ' +
             'route_target_list=\'["target:64512:10000"]\'')
