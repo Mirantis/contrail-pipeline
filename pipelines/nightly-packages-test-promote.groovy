@@ -30,7 +30,9 @@ def testConcurrency = '2'
 def testPassThreshold = '96'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
-def testPattern = '^tungsten_tempest_plugin*|smoke'
+def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
+        '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
+        '|^tempest.api.object_storage*'
 def openstackEnvironment = 'internal_cloud_v2_us'
 def testResult
 
