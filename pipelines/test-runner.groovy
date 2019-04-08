@@ -152,7 +152,7 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
     common.infoMsg('Perform client states to create new resources')
 
     // Add route for public network in case of contrail env
-    salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1')
+    salt.cmdRun(saltMaster, 'I@runtest:salttest', 'route add -net 10.13.128.0/17 gw 10.10.0.1 || true')
 
     if (salt.testTarget(saltMaster, 'I@neutron:client:enabled')) {
         if (mcpVersion == '2018.4.0') {
