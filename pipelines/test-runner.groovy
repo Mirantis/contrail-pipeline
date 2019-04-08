@@ -349,11 +349,11 @@ timeout(time: 6, unit: 'HOURS') {
                         common.warningMsg('Cannot generate tempest config by runtest salt')
                     }
 
-                    if (mcpVersion == '2018.4.0'){
-                        def tempestCfgDir = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_dir'))
-                        def tempestCfgName = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_name'))
-                        def tempestCfgPath = tempestCfgDir + tempestCfgName
+                    def tempestCfgDir = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_dir'))
+                    def tempestCfgName = salt.getReturnValues(salt.getPillar(saltMaster, 'I@runtest:tempest and cfg01*', '_param:runtest_tempest_cfg_name'))
+                    def tempestCfgPath = tempestCfgDir + tempestCfgName
 
+                    if (mcpVersion == '2018.4.0'){
                         def addTempestConf = 'contrail = True\\n' +
                                 '\\n' +
                                 '[patrole]\\n' +
@@ -369,6 +369,10 @@ timeout(time: 6, unit: 'HOURS') {
                         salt.cmdRun(saltMaster, 'I@runtest:tempest and cfg01*', "sed -i 's/\\[auth\\]/\\[auth]\\ntempest_roles = admin/g' ${tempestCfgPath}")
                     }
 
+                    // Temporary workaround for PROD-24982
+                    if (!test_pattern.contains('tungsten_tempest_plugin')) {
+                        salt.cmdRun(saltMaster, 'I@runtest:tempest and cfg01*', "sed -i 's/tempest_roles = admin//g' ${tempestCfgPath}")
+                    }
                     runTempestTestsNew(saltMaster, TEST_TARGET, test_image, args)
 
                     def tempest_stdout

@@ -27,12 +27,9 @@ gerritProtocol = 'https'
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
 def testConcurrency = '2'
-def testPassThreshold = '96'
+def testPassThreshold = '90'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
-def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
-        '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
-        '|^tempest.api.object_storage*'
 def openstackEnvironment = 'internal_cloud_v2_us'
 def testResult
 
@@ -195,31 +192,45 @@ timeout(time: 8, unit: 'HOURS') {
                     throw er
                 }
             }
-            // Perform smoke tests to fail early
-            stage('Run tests'){
-                testMilestone = "MCP1.1"
-                testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
-                testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
-                testBuild = build(job: stackTestJob, parameters: [
-                        string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
-                        string(name: 'TEST_CONF', value: testConf),
-                        string(name: 'TEST_TARGET', value: testTarget),
-                        string(name: 'TEST_CONCURRENCY', value: testConcurrency),
-                        string(name: 'TEST_PATTERN', value: testPattern),
-                        string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
-                        booleanParam(name: 'DELETE_STACK', value: false),
-                        booleanParam(name: 'TESTRAIL', value: true),
-                        string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
-                        string(name: 'TEST_MODEL', value: "${testModel}"),
-                        string(name: 'TEST_PLAN', value: "${testPlan}"),
-                        booleanParam(name: 'FAIL_ON_TESTS', value: true),
-                    ],
+
+            def testMilestone = "MCP1.1"
+            def testPlan = "${testMilestone}-Networking-${new Date().format('yyyy-MM-dd')}"
+            def testBuildParams = [
+                    string(name: 'SALT_MASTER_URL', value: saltMasterUrl),
+                    string(name: 'TEST_CONF', value: testConf),
+                    string(name: 'TEST_TARGET', value: testTarget),
+                    string(name: 'TEST_CONCURRENCY', value: testConcurrency),
+                    string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
+                    booleanParam(name: 'DELETE_STACK', value: false),
+                    booleanParam(name: 'TESTRAIL', value: true),
+                    string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
+                    string(name: 'TEST_PLAN', value: "${testPlan}"),
+                    booleanParam(name: 'FAIL_ON_TESTS', value: true),
+            ]
+            // Temporary workaround for PROD-24982
+            stage('Run tests (tempest)'){
+                def testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_tempest"
+                def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
+                        '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
+                        '|^tempest.api.object_storage*'
+                testBuild = build(job: stackTestJob, parameters: testBuildParams +
+                        string(name: 'TEST_MODEL', value: "${testModel}") +
+                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
                     wait: true,
                 )
-
                 testResult = testBuild.result
-
             }
+            stage('Run tests (tungsten)'){
+                def testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_tungsten"
+                def testPattern = '^tungsten_tempest_plugin*'
+                testBuild = build(job: stackTestJob, parameters: testBuildParams +
+                        string(name: 'TEST_MODEL', value: "${testModel}") +
+                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
+                        wait: true,
+                )
+                testResult = testBuild.result
+            }
+
             // Perform package promotion
             stage('Promote packages'){
                 if (env.PROMOTE_PACKAGES.toBoolean() == true) {
