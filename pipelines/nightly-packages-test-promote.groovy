@@ -209,7 +209,7 @@ timeout(time: 8, unit: 'HOURS') {
             ]
             // Temporary workaround for PROD-24982
             stage('Run tests (tempest)'){
-                def testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_tempest"
+                def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tempest"
                 def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
                         '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
                         '|^tempest.api.object_storage*'
@@ -221,7 +221,7 @@ timeout(time: 8, unit: 'HOURS') {
                 testResult = testBuild.result
             }
             stage('Run tests (tungsten)'){
-                def testModel = "cookied_oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_tungsten"
+                def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tungsten"
                 def testPattern = '^tungsten_tempest_plugin*'
                 testBuild = build(job: stackTestJob, parameters: testBuildParams +
                         string(name: 'TEST_MODEL', value: "${testModel}") +
