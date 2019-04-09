@@ -15,7 +15,7 @@ salt = new com.mirantis.mk.Salt()
 python = new com.mirantis.mk.Python()
 
 String projectName
-String openstack_credentials_id = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
+String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 
 // gerrit variables
@@ -154,11 +154,11 @@ timeout(time: 8, unit: 'HOURS') {
                     mirantisClouds = readYaml(file: 'clouds.yaml')
                     // Configure OpenStack credentials
                     if (mirantisClouds.clouds.containsKey(openstackEnvironment)) {
-                        openstack_credentials_id = mirantisClouds.clouds."${openstackEnvironment}".jenkins_credentials_with_user_pass
+                        openstackCredentialsId = mirantisClouds.clouds."${openstackEnvironment}".jenkins_credentials_with_user_pass
                     } else {
                         error("There is no configuration for ${openstackEnvironment} underlay OpenStack in clouds.yaml")
                     }
-                    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: openstack_credentials_id,
+                    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: openstackCredentialsId,
                         usernameVariable: 'OS_USERNAME', passwordVariable: 'OS_PASSWORD'], ]) {
                             env.OS_USERNAME = OS_USERNAME
                             env.OS_PASSWORD = OS_PASSWORD
@@ -264,20 +264,24 @@ timeout(time: 8, unit: 'HOURS') {
             currentBuild.result = 'FAILURE'
             throw e
         } finally {
-            if ( (currentBuild.result != 'FAILURE')
-                || (testResult == 'SUCCESS')
-                || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
-                    stage ("Delete stack") {
-                        build(job: stackCleanupJob, parameters: [
-                                string(name: 'STACK_NAME', value: stackName),
-                                string(name: 'OS_PROJECT_NAME', value: projectName),
-                                string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
-                                string(name: 'OPENSTACK_API_CREDENTIALS', value: openstack_credentials_id),
-                            ],
-                            propagate: false,
-                            wait: true,
-                        )
+            stage ("Delete stack") {
+                if (env.BUILD_USER_ID) {
+                    common.warningMsg("Skip environment deletion because of manual job run")
+                } else {
+                    if ( (currentBuild.result != 'FAILURE')
+                        || (testResult == 'SUCCESS')
+                        || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
+                            build(job: stackCleanupJob, parameters: [
+                                    string(name: 'STACK_NAME', value: stackName),
+                                    string(name: 'OS_PROJECT_NAME', value: projectName),
+                                    string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
+                                    string(name: 'OPENSTACK_API_CREDENTIALS', value: openstackCredentialsId),
+                                ],
+                                propagate: false,
+                                wait: true,
+                            )
                     }
+                }
             }
         }
     }

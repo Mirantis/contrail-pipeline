@@ -384,20 +384,24 @@ timeout(time: 8, unit: 'HOURS') {
             currentBuild.result = 'FAILURE'
             throw e
         } finally {
-            if ( (currentBuild.result != 'FAILURE')
-                || (testResult == 'SUCCESS')
-                || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
-                    stage ("Delete stack") {
-                        build(job: stackCleanupJob, parameters: [
-                                string(name: 'STACK_NAME', value: stackName),
-                                string(name: 'OS_PROJECT_NAME', value: projectName),
-                                string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
-                                string(name: 'OPENSTACK_API_CREDENTIALS', value: openstackCredentialsId),
-                            ],
-                            propagate: false,
-                            wait: true,
-                        )
+            stage ("Delete stack") {
+                if (env.BUILD_USER_ID) {
+                    common.warningMsg("Skip environment deletion because of manual job run")
+                } else {
+                    if ( (currentBuild.result != 'FAILURE')
+                        || (testResult == 'SUCCESS')
+                        || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
+                            build(job: stackCleanupJob, parameters: [
+                                    string(name: 'STACK_NAME', value: stackName),
+                                    string(name: 'OS_PROJECT_NAME', value: projectName),
+                                    string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
+                                    string(name: 'OPENSTACK_API_CREDENTIALS', value: openstackCredentialsId),
+                                ],
+                                propagate: false,
+                                wait: true,
+                            )
                     }
+                }
             }
         }
     }
