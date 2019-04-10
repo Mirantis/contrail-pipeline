@@ -6,6 +6,8 @@
  */
 
 import static groovy.json.JsonOutput.toJson
+import java.text.SimpleDateFormat
+
 
 common = new com.mirantis.mk.Common()
 gerrit = new com.mirantis.mk.Gerrit()
@@ -13,8 +15,11 @@ git = new com.mirantis.mk.Git()
 openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 python = new com.mirantis.mk.Python()
+mirror = new com.mirantis.mk.Mirror()
 
 String projectName
+String contrailRepoName
+String packageToPromoteList
 String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 
@@ -37,6 +42,10 @@ def testResult
 def mirrorsPromoteJob = 'pkg-promote-from-snapshot'
 def pepperEnv = "pepperEnv"
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
+
+def arch = 'amd64'
+def distribution = 'xenial'
+def repoComponent = 'main'
 
 
 def setContextDefault(contextObject, itemName, itemValue, contextName='default_context'){
@@ -70,6 +79,20 @@ def getPillarValues(saltMaster, target, pillar) {
     return salt.getReturnValues(salt.getPillar(saltMaster, target, pillar))
 }
 
+def getSnapshotMeta(repoUrl) {
+
+    common.warningMsg("Getting snapshot meta")
+    def snapshotHistory = sh(script: "curl -sSfL ${repoUrl.replaceAll(/\/+$/, '')}.target.txt", returnStdout: true)
+    def snapshotRelativePath = snapshotHistory.split("\n")[0]
+
+    def meta = [:]
+    meta.repoUrl = "${repoUrl}/../${snapshotRelativePath}"
+    meta.repoName = snapshotRelativePath.tokenize('/').last().trim()
+    meta.timestamp = ("${meta.repoUrl}" =~ /\d{4}-\d{2}-\d{2}-\d{6}$/).collect { match -> return match }[0]
+
+    return meta
+}
+
 
 timeout(time: 8, unit: 'HOURS') {
     node ('python'){
@@ -79,9 +102,11 @@ timeout(time: 8, unit: 'HOURS') {
                     if (env.BUILD_USER_ID) {
                         stackName = "${env.BUILD_USER_ID}-${JOB_NAME}-${BUILD_NUMBER}"
                         projectName = 'networking-team'
+                        contrailRepoName = "${env.BUILD_USER_ID}-${JOB_NAME}"
                     } else {
                         stackName = "jenkins-${JOB_NAME}-${BUILD_NUMBER}"
                         projectName = 'networking-ci-team'
+                        contrailRepoName = "jenkins-${JOB_NAME}"
                     }
                 }
                 currentBuild.description = "${stackName}"
@@ -107,15 +132,49 @@ timeout(time: 8, unit: 'HOURS') {
                 common.infoMsg("Using test context")
                 common.infoMsg(contextString)
 
-                clusterModelOverrides = [
-                "parameters._param.linux_system_repo_opencontrail_url http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/ infra/init.yml",
-                "parameters._param.linux_system_repo_update_opencontrail_url http://mirror.mirantis.com/update/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/ infra/init.yml",
-                "parameters._param.linux_system_repo_hotfix_opencontrail_url http://mirror.mirantis.com/hotfix/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/ infra/init.yml",
-                "parameters._param.opencontrail_image_tag ${OPENCONTRAIL_REPO_VERSION} infra/init.yml",
-                ].join('\n')
-
-                common.infoMsg(clusterModelOverrides)
             }
+
+            stage("Creating snapshot from ${OPENCONTRAIL_REPO_VERSION} repo"){
+                common.warningMsg("OPENCONTRAIL_REPO_VERSION = ${OPENCONTRAIL_REPO_VERSION}")
+                sourceSnapshotMeta = getSnapshotMeta("http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${distribution}")
+                common.warningMsg("sourceSnapshotMeta = ${sourceSnapshotMeta}")
+
+                common.warningMsg("Getting repo packages list")
+                def packagesUrl = "${sourceSnapshotMeta.repoUrl}/dists/${distribution}/${repoComponent}/source/Sources"
+                def packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
+                packageToPromoteList = packages.split('\n').findAll { it =~ /^Package:(?:(?!ifmap-server).)+$/ }.collect { it.split(': ')[-1]}
+                common.warningMsg("packageToPromoteList = ${packageToPromoteList}")
+
+                build(job: 'pkg-create-repo-snapshot', parameters: [
+                        string(name: 'repoUrl', value: "${sourceSnapshotMeta['repoUrl']} ${distribution} ${repoComponent}"),
+                        string(name: 'repoName', value: "${contrailRepoName}"),
+                        string(name: 'repoOrigin', value: "${contrailRepoName}"),
+                        string(name: 'remoteRepoPath', value: "custom-snapshots/${contrailRepoName}"),
+                        string(name: 'repoSymlink', value: "${distribution}"),
+                        string(name: 'packagesList', value: "${packageToPromoteList.join(' ')}"),
+                        string(name: 'timestamp', value: "${sourceSnapshotMeta.timestamp}"),
+                    ],
+                    wait: true,
+                )
+            }
+
+            def contrailRepoSnapshotHost = 'eu.mirror.infra.mirantis.net'
+            def contrailRepoSnapshotUrl = "http://${contrailRepoSnapshotHost}/custom-snapshots/${contrailRepoName}/${distribution}"
+            def contrailRepoSnapshotMeta = getSnapshotMeta(contrailRepoSnapshotUrl)
+            common.infoMsg("contrailRepoSnapshotMeta = ${contrailRepoSnapshotMeta}")
+
+            // TODO: fix this hack because of various directory structure at snapshots
+            contrailRepoSnapshotMeta.repoUrl = "http://${contrailRepoSnapshotHost}/custom-snapshots/${contrailRepoName}"
+
+            clusterModelOverrides = [
+            "parameters._param.linux_system_repo_opencontrail_url ${contrailRepoSnapshotMeta.repoUrl} infra/init.yml",
+            //"parameters._param.linux_system_repo_update_opencontrail_url ${contrailRepoSnapshotMeta.repoUrl} infra/init.yml",
+            //"parameters._param.linux_system_repo_hotfix_opencontrail_url ${contrailRepoSnapshotMeta.repoUrl} infra/init.yml",
+            "parameters._param.opencontrail_docker_image_tag ${contrailRepoSnapshotMeta.timestamp.replaceAll('-', '')} infra/init.yml",
+            ].join('\n')
+
+            common.infoMsg(clusterModelOverrides)
+
 
             stage('Deploy the environment'){
 
@@ -235,16 +294,11 @@ timeout(time: 8, unit: 'HOURS') {
             stage('Promote packages'){
                 if (env.PROMOTE_PACKAGES.toBoolean() == true) {
                     if (OPENCONTRAIL_REPO_VERSION == 'nightly') {
-                        contrailRepoUrl = "http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${linux_system_codename}"
-                        packagesUrl = "${contrailRepoUrl}/dists/${linux_system_codename}/main/source/Sources"
-                        packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
-                        packageList = packages.split('\n').findAll { it =~ /^Package:(?:(?!ifmap-server).)+$/ }.collect { it.split(': ')[-1]}
-
                         promotionBuild = build(job: mirrorsPromoteJob, parameters: [
-                                string(name: 'repoUrl', value: "${contrailRepoUrl} ${linux_system_codename} main"),
+                                string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
                                 string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
                                 string(name: 'repoDist', value: "${linux_system_codename}"),
-                                string(name: 'packagesToPromote', value: packageList.join(' ')),
+                                string(name: 'packagesToPromote', value: packageToPromoteList.join(' ')),
                             ],
                             propagate: false,
                             wait: true,
