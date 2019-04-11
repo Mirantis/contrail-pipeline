@@ -8,6 +8,7 @@ default_context:
   maas_enabled: 'False'
   offline_deployment: 'False'
   opencontrail_version: '3.0'
+  linux_repo_contrail_component: 'oc311'
   openstack_compute_count: '2'
   kubernetes_compute_count: '2'
   openstack_enabled: 'True'
