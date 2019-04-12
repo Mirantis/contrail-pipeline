@@ -348,6 +348,7 @@ node('docker') {
 
         if (gerritProject == "") {
             stage("publish") {
+                timestampDT = new Date().parse('yyyyMMddHHmmss', timestamp).format('yyyy-MM-dd-HHmmss')
                 dir('src/build/') {
                     stash([
                        name: 'builtArtifacts',
@@ -389,6 +390,7 @@ node('docker') {
                         "repoDist=${repoDist}",
                         "repoComponent=${repoComponent}",
                         "signKey=${signKey}",
+                        "TIMESTAMP=${timestampDT}",
                     ]) {
                         sh(publisherScript)
                     }
@@ -400,6 +402,7 @@ node('docker') {
                             "remoteRepoPath=/srv/aptly/public",
                             "mirrorList=${mirrorList}",
                             "trsyncDir=${trsyncPath}",
+                            "TIMESTAMP=${timestampDT}",
                         ]) {
                             sshagent (credentials: [syncCredentials]) {
                                 sh(syncScript)
