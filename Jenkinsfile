@@ -24,6 +24,8 @@
  *   SOURCE_CREDENTIALS     Credentials to use to checkout source
  */
 
+import java.text.SimpleDateFormat
+
 // Load shared libs
 def common = new com.mirantis.mk.Common()
 def git = new com.mirantis.mk.Git()
@@ -348,7 +350,7 @@ node('docker') {
 
         if (gerritProject == "") {
             stage("publish") {
-                timestampDT = new Date().parse('yyyyMMddHHmmss', timestamp).format('yyyy-MM-dd-HHmmss')
+                timestampDT = new SimpleDateFormat('yyyyMMddHHmmss').parse(timestamp).format('yyyy-MM-dd-HHmmss')
                 dir('src/build/') {
                     stash([
                        name: 'builtArtifacts',
