@@ -46,6 +46,7 @@ def timestamp = common.getDatetime()
 def version = SOURCE_BRANCH.replace('R', '') + "~${timestamp}"
 if (SOURCE_BRANCH == "master")
     version = "666~${timestamp}"
+String buildName = env.BUILD_NAME
 String mcpBuildId = env.MCP_BUILD_ID ?: 'nightly'
 String publisherNodeName = env.PUBLISHER_LABEL ?: 'pkg-publisher-v2'
 String repoName = env.REPO_NAME ?: env.PPA.tokenize('/').last()
@@ -57,6 +58,8 @@ String trsyncProject = env.TRSYNC_PROJECT ?: 'https://review.fuel-infra.org/infr
 String trsyncRef = env.TRSYNC_REFSPEC ?: 'stable/0.9'
 String syncCredentials = env.RSYNC_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
 String mirrorList = env.MIRROR_LIST ?: 'jenkins@mirror.mcp.mirantis.net'
+String dockerImagesGerritRepoUrl = 'ssh://mcp-jenkins@gerrit.mcp.mirantis.net:29418/mk/docker-opencontrail'
+def containerizedReleases = ['R4.0', 'R4.1', 'R5.0']
 
 def publishRetryAttempts = 10
 
@@ -349,7 +352,7 @@ node('docker') {
         }
 
         if (gerritProject == "") {
-            stage("publish") {
+            stage("publish packages") {
                 timestampDT = new SimpleDateFormat('yyyyMMddHHmmss').parse(timestamp).format('yyyy-MM-dd-HHmmss')
                 dir('src/build/') {
                     stash([
@@ -414,7 +417,7 @@ node('docker') {
                 }
             }
 
-            stage("upload") {
+            stage("upload packages to artifactory") {
                 buildSteps = [:]
                 debFiles = sh script: "ls src/build/*.deb", returnStdout: true
                 for (file in debFiles.tokenize()) {
@@ -434,6 +437,20 @@ node('docker') {
                     }
                 }
                 parallel buildSteps
+            }
+
+            if (SOURCE_BRANCH in containerizedReleases) {
+                stage("build docker images") {
+                    // trigger OpenContrail Docker image build pipeline
+                    build(job: "docker-build-images-opencontrail-${buildName}-${DIST}", parameters: [
+                        string(name: 'OC_VERSION', value: buildName),
+                        string(name: 'IMAGE_BRANCH', value: SOURCE_BRANCH),
+                        string(name: 'IMAGE_GIT_URL', value: dockerImagesGerritRepoUrl),
+                        string(name: 'IMAGE_CREDENTIALS_ID', value: SOURCE_CREDENTIALS),
+                        string(name: 'REGISTRY_CREDENTIALS_ID', value: 'dockerhub'),
+                        string(name: 'SYSTEM_CODENAME', value: DIST)]
+                    )
+                }
             }
         }
 
