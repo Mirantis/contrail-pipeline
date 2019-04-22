@@ -236,7 +236,7 @@ timeout(time: 8, unit: 'HOURS') {
                 if (env.PROMOTE_PACKAGES.toBoolean() == true) {
                     if (OPENCONTRAIL_REPO_VERSION == 'nightly') {
                         contrailRepoUrl = "http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${linux_system_codename}"
-                        packagesUrl = "${contrailRepoUrl}/dists/${linux_system_codename}/main/binary-${linux_system_architecture}/Packages"
+                        packagesUrl = "${contrailRepoUrl}/dists/${linux_system_codename}/main/source/Sources"
                         packages = sh(script: "curl -sSfL ${packagesUrl}", returnStdout: true)
                         packageList = packages.split('\n').findAll { it =~ /^Package:(?:(?!ifmap-server).)+$/ }.collect { it.split(': ')[-1]}
 
