@@ -132,6 +132,10 @@ timeout(time: 8, unit: 'HOURS') {
                 common.infoMsg("Using test context")
                 common.infoMsg(contextString)
 
+                extraRepos = readYaml text: EXTRA_REPOS
+                def extraReposYaml = contextsRootPath + '-extraRepos.yaml'
+                writeYaml file: extraReposYaml, data: extraRepos
+                extraReposString = readFile extraReposYaml
             }
 
             stage("Creating snapshot from ${OPENCONTRAIL_REPO_VERSION} repo"){
@@ -192,7 +196,7 @@ timeout(time: 8, unit: 'HOURS') {
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
                         string(name: 'HEAT_TEMPLATES_REFSPEC', value: "${heatTemplatesChange.currentPatchSet.ref}"),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
-                        textParam(name: 'EXTRA_REPOS', value: ""),
+                        textParam(name: 'EXTRA_REPOS', value: "${extraReposString}"),
                     ],
                     wait: true,
                 )
