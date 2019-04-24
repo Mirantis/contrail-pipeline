@@ -19,7 +19,6 @@ mirror = new com.mirantis.mk.Mirror()
 
 String projectName
 String contrailRepoName
-String packageToPromoteList
 String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 
@@ -46,6 +45,7 @@ def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 def arch = 'amd64'
 def distribution = 'xenial'
 def repoComponent = 'main'
+def packageToPromoteList = []
 
 
 def setContextDefault(contextObject, itemName, itemValue, contextName='default_context'){
