@@ -16,6 +16,7 @@ openstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 python = new com.mirantis.mk.Python()
 mirror = new com.mirantis.mk.Mirror()
+mcpCommon = new com.mirantis.mcp.Common()
 
 String projectName
 String contrailRepoName
@@ -132,10 +133,10 @@ timeout(time: 8, unit: 'HOURS') {
                 common.infoMsg("Using test context")
                 common.infoMsg(contextString)
 
-                extraRepos = readYaml text: EXTRA_REPOS
-                def extraReposYaml = contextsRootPath + '-extraRepos.yaml'
-                writeYaml file: extraReposYaml, data: extraRepos
-                extraReposString = readFile extraReposYaml
+                if (env.EXTRA_REPOS){
+                    extraRepos = readYaml text: EXTRA_REPOS
+                    extraReposString = mcpCommon.dumpYAML(extraRepos)
+                }
             }
 
             stage("Creating snapshot from ${OPENCONTRAIL_REPO_VERSION} repo"){
