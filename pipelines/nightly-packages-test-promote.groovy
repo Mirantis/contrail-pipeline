@@ -48,6 +48,8 @@ def distribution = 'xenial'
 def repoComponent = 'main'
 def packageToPromoteList = []
 
+// env parameters
+def extraReposString = ''
 
 def setContextDefault(contextObject, itemName, itemValue, contextName='default_context'){
     if (!contextObject[contextName].containsKey(itemName)){
