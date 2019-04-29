@@ -36,7 +36,7 @@ String sshOpt = '-q -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
 def testConcurrency = '2'
-def testPassThreshold = '86'
+def testPassThreshold = '80'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
 def testResult
