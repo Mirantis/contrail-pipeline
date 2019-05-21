@@ -155,7 +155,7 @@ timeout(time: 8, unit: 'HOURS') {
                 build(job: 'pkg-create-repo-snapshot', parameters: [
                         string(name: 'repoUrl', value: "${sourceSnapshotMeta['repoUrl']} ${distribution} ${repoComponent}"),
                         string(name: 'repoName', value: "${contrailRepoName}"),
-                        string(name: 'repoOrigin', value: "${contrailRepoName}"),
+                        string(name: 'repoOrigin', value: "Mirantis"),
                         string(name: 'remoteRepoPath', value: "custom-snapshots/${contrailRepoName}"),
                         string(name: 'repoSymlink', value: "${distribution}"),
                         string(name: 'packagesList', value: "${packageToPromoteList.join(' ')}"),
