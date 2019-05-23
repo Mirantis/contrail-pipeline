@@ -185,8 +185,7 @@ timeout(time: 8, unit: 'HOURS') {
 
             stage('Deploy the environment'){
 
-                heatTemplatesChange = gerrit.getGerritChange(gerritName, gerritHost, '34331', gerritCredentials, true)
-                build(job: 'create-mcp-env', parameters: [
+                deploy_build = build(job: 'create-mcp-env', parameters: [
                         string(name: 'STACK_NAME', value: stackName),
                         string(name: 'OS_AZ', value: "nova"),
                         string(name: 'OS_PROJECT_NAME', value: projectName),
@@ -197,7 +196,8 @@ timeout(time: 8, unit: 'HOURS') {
                         booleanParam(name: 'COLLECT_LOGS', value: true),
                         textParam(name: 'CLUSTER_MODEL_OVERRIDES', value: "${clusterModelOverrides}"),
                         string(name: 'OPENSTACK_ENVIRONMENT', value: openstackEnvironment),
-                        string(name: 'HEAT_TEMPLATES_REFSPEC', value: "${heatTemplatesChange.currentPatchSet.ref}"),
+                        string(name: 'REFSPEC', value: ""),
+                        string(name: 'HEAT_TEMPLATES_REFSPEC', value: ""),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
                         textParam(name: 'EXTRA_REPOS', value: "${extraReposString}"),
                     ],
