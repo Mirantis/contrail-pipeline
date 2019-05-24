@@ -137,6 +137,9 @@ def configureRuntestNode(saltMaster, nodeName, testTarget, tempestCfgDir, logDir
         params_to_update['openstack_public_neutron_subnet_cidr'] = '10.13.0.0/16'
         params_to_update['openstack_public_neutron_subnet_allocation_start'] = '10.13.128.0'
         params_to_update['openstack_public_neutron_subnet_allocation_end'] = '10.13.255.254'
+    } else {
+        // Fix for PROD-25148
+        classes_to_add.add('service.runtest.tempest.tempest_net')
     }
 
     result = salt.runSaltCommand(saltMaster, 'local', saltMasterTarget, 'reclass.node_update', null, null, ['name': "${fullnodename}", 'classes': classes_to_add, 'parameters': params_to_update])
