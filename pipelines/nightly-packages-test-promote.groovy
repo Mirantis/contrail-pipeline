@@ -40,6 +40,7 @@ def testResult
 
 //promote parameters
 def mirrorsPromoteJob = 'pkg-promote-from-snapshot'
+def saltFormulasPromoteJob = 'pkg-promote'
 def imagesPromoteJob = 'docker-images-mirror'
 def pepperEnv = "pepperEnv"
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
@@ -273,6 +274,8 @@ timeout(time: 8, unit: 'HOURS') {
                 if (env.PROMOTE_PACKAGES.toBoolean() == true) {
                     if (OPENCONTRAIL_REPO_VERSION == 'nightly') {
 
+                        saltFormulasToPromote = 'salt-formula-opencontrail'
+
                         OC_VERSION = "oc${OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
                         imageList = '''
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-agent:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
@@ -283,32 +286,48 @@ timeout(time: 8, unit: 'HOURS') {
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-kube-manager:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                         '''.trim().replaceAll(/(?m)^ +/, '')
 
-                            contrailPromotionBuild = build(job: mirrorsPromoteJob, parameters: [
-                                    string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
-                                    string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
-                                    string(name: 'repoDist', value: "${linux_system_codename}"),
-                                    string(name: 'packagesToPromote', value: packageToPromoteList.join(' ')),
-                                ],
-                                propagate: false,
-                                wait: true,
-                            )
-
-                            imagePromotionBuild = build(job: imagesPromoteJob, parameters: [
-                                    textParam(name: 'IMAGE_LIST', value: "${imageList}"),
-                                    string(name: 'SOURCE_IMAGE_TAG', value: "${contrailRepoSnapshotMeta.timestamp.replaceAll('-', '')}"),
-                                    string(name: 'IMAGE_TAG', value: "testing"),
-                                    string(name: 'REGISTRY_URL', value: "https://docker-prod-local.docker.mirantis.net"),
-                                    string(name: 'TARGET_REGISTRY_CREDENTIALS_ID', value: "artifactory"),
-                                ],
-                                propagate: false,
-                                wait: true,
-                            )
-
+                        contrailPromotionBuild = build(job: mirrorsPromoteJob, parameters: [
+                                string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
+                                string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
+                                string(name: 'repoDist', value: "${linux_system_codename}"),
+                                string(name: 'packagesToPromote', value: packageToPromoteList.join(' ')),
+                            ],
+                            propagate: false,
+                            wait: true,
+                        )
                         if (contrailPromotionBuild.result != 'SUCCESS'){
                             error('Failed to promote opencontrail packages from nightly to testing repo.')
                         }
+
+                        imagePromotionBuild = build(job: imagesPromoteJob, parameters: [
+                                textParam(name: 'IMAGE_LIST', value: "${imageList}"),
+                                string(name: 'SOURCE_IMAGE_TAG', value: "${contrailRepoSnapshotMeta.timestamp.replaceAll('-', '')}"),
+                                string(name: 'IMAGE_TAG', value: "testing"),
+                                string(name: 'REGISTRY_URL', value: "https://docker-prod-local.docker.mirantis.net"),
+                                string(name: 'TARGET_REGISTRY_CREDENTIALS_ID', value: "artifactory"),
+                            ],
+                            propagate: false,
+                            wait: true,
+                        )
                         if (imagePromotionBuild.result != 'SUCCESS'){
                             error('Failed to promote opencontrail docker images from nightly to testing repo.')
+                        }
+
+                        if(env.MCP_VERSION == 'nightly') {
+                            saltFormulaPromotionBuild = build(job: saltFormulasPromoteJob, parameters: [
+                                    string(name: 'repoName', value: "salt-formulas"),
+                                    string(name: 'repoDist', value: "${linux_system_codename}"),
+                                    string(name: 'promoteFrom', value: "nightly"),
+                                    string(name: 'promoteTo', value: "testing"),
+                                    string(name: 'packagesToPromote', value: "${saltFormulasToPromote}"),
+                                    string(name: 'mirrorList', value: "jenkins@mirror.mcp.mirantis.net jenkins@mirror2.mcp.mirantis.net jenkins@mirror-us.mcp.mirantis.net"),
+                                ],
+                                propagate: false,
+                                wait: true,
+                            )
+                            if (saltFormulaPromotionBuild.result != 'SUCCESS'){
+                                error('Failed to promote salt-formula packages from nightly to testing repo.')
+                            }
                         }
 
                     } else {
