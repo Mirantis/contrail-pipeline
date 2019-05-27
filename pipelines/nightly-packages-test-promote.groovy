@@ -207,37 +207,7 @@ timeout(time: 8, unit: 'HOURS') {
 
             stage('Get environment information'){
 
-                // checkout mcp-env/pipelines repository
-                dir("${workspace}/mcp-env/pipelines") {
-                    checkout([ $class: 'GitSCM',
-                        branches: [ [name: 'FETCH_HEAD'], ],
-                        userRemoteConfigs: [
-                            [url: 'ssh://gerrit.mcp.mirantis.com:29418/mcp-env/pipelines',
-                            refspec: 'master',
-                            credentialsId: 'gerrit'],
-                        ],
-                    ])
-                    mirantisClouds = readYaml(file: 'clouds.yaml')
-                    // Configure OpenStack credentials
-                    if (mirantisClouds.clouds.containsKey(openstackEnvironment)) {
-                        openstackCredentialsId = mirantisClouds.clouds."${openstackEnvironment}".jenkins_credentials_with_user_pass
-                    } else {
-                        error("There is no configuration for ${openstackEnvironment} underlay OpenStack in clouds.yaml")
-                    }
-                    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: openstackCredentialsId,
-                        usernameVariable: 'OS_USERNAME', passwordVariable: 'OS_PASSWORD'], ]) {
-                            env.OS_USERNAME = OS_USERNAME
-                            env.OS_PASSWORD = OS_PASSWORD
-                    }
-                    env.OS_PROJECT_NAME = projectName
-                    env.OS_CLOUD = openstackEnvironment
-
-                    // create openstack env
-                    openstack = 'set +x; venv/bin/openstack '
-                    sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
-                    // get salt master host ip
-                    saltMasterHost = sh(script: "$openstack stack show -f value -c outputs ${stackName} | jq -r .[0].output_value", returnStdout: true).trim()
-                }
+                saltMasterHost = "${deploy_build.description.tokenize(' ')[1]}"
 
                 currentBuild.description = "${currentBuild.description}<br>${saltMasterHost}"
                 saltMasterUrl = "http://${saltMasterHost}:6969"
