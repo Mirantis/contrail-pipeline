@@ -40,6 +40,7 @@ def testResult
 
 //promote parameters
 def mirrorsPromoteJob = 'pkg-promote-from-snapshot'
+def imagesPromoteJob = 'docker-images-mirror'
 def pepperEnv = "pepperEnv"
 def stackCleanupJob = 'delete-heat-stack-for-mcp-env'
 
@@ -267,22 +268,49 @@ timeout(time: 8, unit: 'HOURS') {
                 testResult = testBuild.result
             }
 
-            // Perform package promotion
-            stage('Promote packages'){
+            // Perform promotion
+            stage('Promote artifacts'){
                 if (env.PROMOTE_PACKAGES.toBoolean() == true) {
                     if (OPENCONTRAIL_REPO_VERSION == 'nightly') {
-                        promotionBuild = build(job: mirrorsPromoteJob, parameters: [
-                                string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
-                                string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
-                                string(name: 'repoDist', value: "${linux_system_codename}"),
-                                string(name: 'packagesToPromote', value: packageToPromoteList.join(' ')),
-                            ],
-                            propagate: false,
-                            wait: true,
-                        )
-                        if (promotionBuild.result != 'SUCCESS'){
-                            error('Failed to promote snapshot from nightly to testing repo.')
+
+                        OC_VERSION = "oc${OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
+                        imageList = '''
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-agent:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-analytics:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-analyticsdb:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-base:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-controller:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                            docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-kube-manager:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
+                        '''.trim().replaceAll(/(?m)^ +/, '')
+
+                            contrailPromotionBuild = build(job: mirrorsPromoteJob, parameters: [
+                                    string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
+                                    string(name: 'repoName', value: "opencontrail-${OPENCONTRAIL_VERSION}"),
+                                    string(name: 'repoDist', value: "${linux_system_codename}"),
+                                    string(name: 'packagesToPromote', value: packageToPromoteList.join(' ')),
+                                ],
+                                propagate: false,
+                                wait: true,
+                            )
+
+                            imagePromotionBuild = build(job: imagesPromoteJob, parameters: [
+                                    textParam(name: 'IMAGE_LIST', value: "${imageList}"),
+                                    string(name: 'SOURCE_IMAGE_TAG', value: "${contrailRepoSnapshotMeta.timestamp.replaceAll('-', '')}"),
+                                    string(name: 'IMAGE_TAG', value: "testing"),
+                                    string(name: 'REGISTRY_URL', value: "https://docker-prod-local.docker.mirantis.net"),
+                                    string(name: 'TARGET_REGISTRY_CREDENTIALS_ID', value: "artifactory"),
+                                ],
+                                propagate: false,
+                                wait: true,
+                            )
+
+                        if (contrailPromotionBuild.result != 'SUCCESS'){
+                            error('Failed to promote opencontrail packages from nightly to testing repo.')
                         }
+                        if (imagePromotionBuild.result != 'SUCCESS'){
+                            error('Failed to promote opencontrail docker images from nightly to testing repo.')
+                        }
+
                     } else {
                         common.warningMsg("Promotion skipped because OPENCONTRAIL_REPO_VERSION==${OPENCONTRAIL_REPO_VERSION}, is not 'nightly'")
                     }
