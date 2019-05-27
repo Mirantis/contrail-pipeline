@@ -121,14 +121,22 @@ timeout(time: 8, unit: 'HOURS') {
             stage('Getting test context'){
                 testContext = readYaml text: TEST_CONTEXT
 
+                if (OPENSTACK_ENABLED.toBoolean() ^ KUBERNETES_ENABLED.toBoolean()) {
+                    error("Only one of the parameters (OPENSTACK_ENABLED, KUBERNETES_ENABLED) should be set to 'True'")
+                }
+
                 // opencontrail_version priority (by descending): testContext, env.OPENCONTRAIL_VERSION, 'core,openstack,contrail'
                 setContextDefault(testContext, 'opencontrail_version', env.OPENCONTRAIL_VERSION ?: '4.1')
                 setContextDefault(testContext, 'mcp_version', env.MCP_VERSION ?: 'testing')
                 setContextDefault(testContext, 'openstack_enabled', (env.OPENSTACK_ENABLED == 'true' ? 'True' : 'False') ?: 'True')
-                setContextDefault(testContext, 'openstack_version', env.OPENSTACK_VERSION ?: 'queens')
-
-                testContextName = "oc${testContext.default_context.opencontrail_version.replaceAll(/\./, '')}-${testContext.default_context.openstack_version}"
-                currentBuild.description = "${currentBuild.description}<br>${testContextName}"
+                setContextDefault(testContext, 'kubernetes_enabled', (env.KUBERNETES_ENABLED == 'true' ? 'True' : 'False') ?: 'False')
+                if (OPENSTACK_ENABLED.toBoolean() == true) {
+                    setContextDefault(testContext, 'openstack_version', env.OPENSTACK_VERSION ?: 'queens')
+                } else if (KUBERNETES_ENABLED.toBoolean() == true) {
+                    setContextDefault(testContext, 'kubernetes_network_opencontrail_enabled', 'True')
+                    setContextDefault(testContext, 'kubernetes_network_calico_enabled', 'False')
+                    setContextDefault(testContext, 'openstack_cluster_size', 'k8s_contrail')
+                }
 
                 def testContextYaml = contextsRootPath + '-context.yaml'
                 sh "rm -f $testContextYaml"
@@ -202,6 +210,7 @@ timeout(time: 8, unit: 'HOURS') {
                         string(name: 'HEAT_TEMPLATES_REFSPEC', value: ""),
                         textParam(name: 'HEAT_STACK_CONTEXT', value: ""),
                         textParam(name: 'EXTRA_REPOS', value: "${extraReposString}"),
+                        string(name: 'COOKIECUTTER_TEMPLATE_CONTEXT_FILE', value: "${COOKIECUTTER_TEMPLATE_CONTEXT_FILE}"),
                     ],
                     wait: true,
                 )
@@ -221,13 +230,17 @@ timeout(time: 8, unit: 'HOURS') {
                 linux_system_architecture = getPillarValues(saltMaster, 'I@salt:master', '_param:linux_system_architecture')
                 linux_system_codename = getPillarValues(saltMaster, 'I@salt:master', '_param:linux_system_codename')
             }
-            stage('Opencontrail controllers health check') {
-                python.setupPepperVirtualenv(pepperEnv, saltMasterUrl, saltMasterCredentials)
-                try {
-                    salt.enforceState(pepperEnv, 'I@opencontrail:control or I@opencontrail:collector', 'opencontrail.upgrade.verify', true, true)
-                } catch (Exception er) {
-                    common.errorMsg("OpenContrail controllers health check stage found issues with services. Please take a look at the logs above.")
-                    throw er
+
+            // skip for k8s deployment
+            if (OPENSTACK_ENABLED.toBoolean() == true) {
+                stage('Opencontrail controllers health check') {
+                    python.setupPepperVirtualenv(pepperEnv, saltMasterUrl, saltMasterCredentials)
+                    try {
+                        salt.enforceState(pepperEnv, 'I@opencontrail:control or I@opencontrail:collector', 'opencontrail.upgrade.verify', true, true)
+                    } catch (Exception er) {
+                        common.errorMsg("OpenContrail controllers health check stage found issues with services. Please take a look at the logs above.")
+                        throw er
+                    }
                 }
             }
 
@@ -245,28 +258,45 @@ timeout(time: 8, unit: 'HOURS') {
                     string(name: 'TEST_PLAN', value: "${testPlan}"),
                     booleanParam(name: 'FAIL_ON_TESTS', value: true),
             ]
-            // Temporary workaround for PROD-24982
-            stage('Run tests (tempest)'){
-                def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tempest"
-                def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
-                        '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
-                        '|^tempest.api.object_storage*'
-                testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                        string(name: 'TEST_MODEL', value: "${testModel}") +
-                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
-                    wait: true,
-                )
-                testResult = testBuild.result
-            }
-            stage('Run tests (tungsten)'){
-                def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tungsten"
-                def testPattern = '^tungsten_tempest_plugin*'
-                testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                        string(name: 'TEST_MODEL', value: "${testModel}") +
-                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
+
+            if (OPENSTACK_ENABLED.toBoolean() == true) {
+                // Temporary workaround for PROD-24982
+                stage('Run tests (tempest)'){
+                    def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tempest"
+                    def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
+                            '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
+                            '|^tempest.api.object_storage*'
+                    testBuild = build(job: stackTestJob, parameters: testBuildParams +
+                            string(name: 'TEST_MODEL', value: "${testModel}") +
+                            string(name: 'TEST_PATTERN', value: "${testPattern}"),
                         wait: true,
-                )
-                testResult = testBuild.result
+                    )
+                    testResult = testBuild.result
+                }
+                stage('Run tests (tungsten)'){
+                    def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tungsten"
+                    def testPattern = '^tungsten_tempest_plugin*'
+                    testBuild = build(job: stackTestJob, parameters: testBuildParams +
+                            string(name: 'TEST_MODEL', value: "${testModel}") +
+                            string(name: 'TEST_PATTERN', value: "${testPattern}"),
+                            wait: true,
+                    )
+                    testResult = testBuild.result
+                }
+            } else if (KUBERNETES_ENABLED.toBoolean() == true) {
+
+                stage ('Run tests (conformance)') {
+                    build (job: "mcp_k8s_run_conformance", parameters: [
+                            string(name: 'STACK_NAME', value: stackName),
+                            string(name: 'OPENSTACK_API_PROJECT', value: projectName),
+                            string(name: 'K8S_API_SERVER', value: 'http://127.0.0.1:8080'),
+                            string(name: 'K8S_MASTER_SALT_TARGET', value: 'I@kubernetes:master'),
+                            string(name: 'K8S_CONFORMANCE_IMAGE', value: ''),
+                            string(name: 'AUTODETECT', value: 'True'),
+                        ]
+                    )
+                }
+
             }
 
             // Perform promotion
