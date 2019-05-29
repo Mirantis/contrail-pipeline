@@ -143,7 +143,7 @@ timeout(time: 8, unit: 'HOURS') {
 
             stage("Creating snapshot from ${OPENCONTRAIL_REPO_VERSION} repo"){
                 common.warningMsg("OPENCONTRAIL_REPO_VERSION = ${OPENCONTRAIL_REPO_VERSION}")
-                sourceSnapshotMeta = getSnapshotMeta("http://mirror.mirantis.com/${OPENCONTRAIL_REPO_VERSION}/opencontrail-${OPENCONTRAIL_VERSION}/${distribution}")
+                sourceSnapshotMeta = getSnapshotMeta("http://mirror.mirantis.com/.snapshots/${OPENCONTRAIL_REPO_VERSION}-opencontrail-${OPENCONTRAIL_VERSION}-${distribution}-latest")
                 common.warningMsg("sourceSnapshotMeta = ${sourceSnapshotMeta}")
 
                 common.warningMsg("Getting repo packages list")
