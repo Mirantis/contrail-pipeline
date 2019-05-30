@@ -121,7 +121,7 @@ timeout(time: 8, unit: 'HOURS') {
             stage('Getting test context'){
                 testContext = readYaml text: TEST_CONTEXT
 
-                if (OPENSTACK_ENABLED.toBoolean() ^ KUBERNETES_ENABLED.toBoolean()) {
+                if (!(OPENSTACK_ENABLED.toBoolean() ^ KUBERNETES_ENABLED.toBoolean())) {
                     error("Only one of the parameters (OPENSTACK_ENABLED, KUBERNETES_ENABLED) should be set to 'True'")
                 }
 
