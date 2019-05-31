@@ -376,10 +376,10 @@ timeout(time: 8, unit: 'HOURS') {
                 if (env.BUILD_USER_ID) {
                     common.warningMsg("Skip environment deletion because of manual job run")
                 } else {
-                    stage ("Delete stack") {
-                        if ( (currentBuild.result != 'FAILURE')
-                            || (testResult == 'SUCCESS')
-                            || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
+                    if ( (currentBuild.result != 'FAILURE')
+                        || (testResult == 'SUCCESS')
+                        || (common.validInputParam('DELETE_STACK_ON_FAILURE') && DELETE_STACK_ON_FAILURE.toBoolean() == true) ) {
+                            stage ("Delete stack") {
                                 build(job: stackCleanupJob, parameters: [
                                         string(name: 'STACK_NAME', value: stackName),
                                         string(name: 'OS_PROJECT_NAME', value: projectName),
@@ -389,7 +389,9 @@ timeout(time: 8, unit: 'HOURS') {
                                     propagate: false,
                                     wait: true,
                                 )
-                        }
+                            }
+                    } else {
+                        common.warningMsg("Skip environment deletion because something went wrong. See logs")
                     }
                 }
             }
