@@ -9,7 +9,7 @@ ARCH ?= amd64
 
 REPOSITORY_TAGS := CEILOMETER_SHA HEAT_SHA WEB_CONTROLLER_SHA WEB_CORE_SHA CONTROLLER_SHA NEUTRON_PLUGIN_SHA NOVA_CONTRAIL_SHA THIRD_PARTY_SHA VROUTER_SHA
 
-ifeq ($(SOURCE_BRANCH), "R5.0")
+ifeq ($(SOURCE_BRANCH), $(filter $(SOURCE_BRANCH),"R5.0" "R5.1"))
 REPOSITORY_TAGS += ANALYTICS_SHA CONTRAIL_API_SHA
 endif
 
@@ -97,7 +97,7 @@ add-code-specific-sha-%: set-shas
 			sed -i 's/XB-Private-MCP-Code-SHA: $(sha)/XB-Private-MCP-Code-SHA: $($(sha))/g' control);)
 
 set-shas:
-ifeq ($(SOURCE_BRANCH), "R5.0")
+ifeq ($(SOURCE_BRANCH), $(filter $(SOURCE_BRANCH),"R5.0" "R5.1"))
 	$(eval ANALYTICS_SHA := $(shell cd $(CWD)/src/src/contrail-analytics; git rev-parse HEAD))
 	$(eval CONTRAIL_API_SHA := $(shell cd $(CWD)/src/src/contrail-api-client; git rev-parse HEAD))
 endif
