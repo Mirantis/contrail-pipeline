@@ -345,7 +345,7 @@ timeout(time: 8, unit: 'HOURS') {
                             error('Failed to promote opencontrail docker images from nightly to testing repo.')
                         }
 
-                        if(env.MCP_VERSION == 'nightly') {
+                        if(env.MCP_VERSION == '2019.2.0') {
                             saltFormulaPromotionBuild = build(job: saltFormulasPromoteJob, parameters: [
                                     string(name: 'repoName', value: "salt-formulas"),
                                     string(name: 'repoDist', value: "${linux_system_codename}"),
