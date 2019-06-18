@@ -23,7 +23,7 @@ String contrailRepoName
 String openstackCredentialsId = env.OPENSTACK_CREDENTIALS_ID ?: 'openstack-devcloud-credentials'
 String saltMasterCredentials = env.SALT_MASTER_CREDENTIALS ?: 'salt-qa-credentials'
 
-String mirrorList = env.MIRROR_LIST ?: 'jenkins@mirror-us.mcp.mirantis.net jenkins@mirror.mcp.mirantis.net'
+String mirrorList = env.MIRROR_LIST ?: 'jenkins@mirror-us.mcp.mirantis.net jenkins@mirror.mcp.mirantis.net jenkins@mirror.us.mirantis.com'
 
 // gerrit variables
 gerritCredentials = env.CREDENTIALS_ID ?: 'gerrit'
