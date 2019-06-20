@@ -309,14 +309,14 @@ timeout(time: 8, unit: 'HOURS') {
                         saltFormulasToPromote = 'salt-formula-opencontrail'
 
                         OC_VERSION = "oc${OPENCONTRAIL_VERSION.replaceAll(/\./, '')}"
-                        imageList = '''
+                        imageList = """
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-agent:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-analytics:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-analyticsdb:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-base:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-controller:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
                             docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}/opencontrail-kube-manager:SUBS_SOURCE_IMAGE_TAG docker-prod-local.docker.mirantis.net/opencontrail-${OC_VERSION}
-                        '''.trim().replaceAll(/(?m)^ +/, '')
+                        """.trim().replaceAll(/(?m)^ +/, '')
 
                         contrailPromotionBuild = build(job: mirrorsPromoteJob, parameters: [
                                 string(name: 'repoUrl', value: "${sourceSnapshotMeta.repoUrl} ${linux_system_codename} ${repoComponent}"),
