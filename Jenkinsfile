@@ -59,7 +59,7 @@ String trsyncRef = env.TRSYNC_REFSPEC ?: 'stable/0.9'
 String syncCredentials = env.RSYNC_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
 String mirrorList = env.MIRROR_LIST ?: 'jenkins@mirror-us.mcp.mirantis.net jenkins@mirror.mcp.mirantis.net'
 String dockerImagesGerritRepoUrl = 'ssh://mcp-jenkins@gerrit.mcp.mirantis.net:29418/mk/docker-opencontrail'
-def containerizedReleases = ['R4.0', 'R4.1', 'R5.0']
+def containerizedReleases = ['R4.0', 'R4.1', 'R5.0', 'R5.1']
 
 def publishRetryAttempts = 10
 
