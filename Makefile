@@ -9,6 +9,33 @@ ARCH ?= amd64
 
 REPOSITORY_TAGS := CEILOMETER_SHA HEAT_SHA WEB_CONTROLLER_SHA WEB_CORE_SHA CONTROLLER_SHA NEUTRON_PLUGIN_SHA NOVA_CONTRAIL_SHA THIRD_PARTY_SHA VROUTER_SHA
 
+#OpenContrail 5.1 fetch packages file is written in python3, older versions need python2
+PYTHON_VERSION := python2
+ifeq ($(SOURCE_BRANCH), "R5.1")
+PYTHON_VERSION := python3
+endif
+
+BUILD_ALL_SOURCE := build-source-contrail-web-core \
+	build-source-contrail-web-controller \
+	build-source-contrail \
+	build-source-contrail-vrouter-dpdk \
+	build-source-neutron-plugin-contrail \
+	build-source-ceilometer-plugin-contrail \
+	build-source-contrail-heat
+
+BUILD_ALL_BINARY := build-binary-contrail-web-core \
+	build-binary-contrail-web-controller \
+	build-binary-contrail \
+	build-binary-contrail-vrouter-dpdk \
+	build-binary-neutron-plugin-contrail \
+	build-binary-ceilometer-plugin-contrail \
+	build-binary-contrail-heat
+
+ifneq ($(SOURCE_BRANCH), $(filter $(SOURCE_BRANCH),"R4.0" "R4.1" "R5.0" "R5.1"))
+BUILD_ALL_SOURCE += build-source-ifmap-server
+BUILD_ALL_BINARY += build-binary-ifmap-server
+endif
+
 ifeq ($(SOURCE_BRANCH), $(filter $(SOURCE_BRANCH),"R5.0" "R5.1"))
 REPOSITORY_TAGS += ANALYTICS_SHA CONTRAIL_API_SHA
 endif
@@ -45,18 +72,10 @@ clean:
 test: build-source
 	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src -e USER=jenkins --rm=true build-$(OS)-$(DIST)-$(ARCH) /bin/bash -c "../scripts/run_tests.sh"
 
-build-source: \
-	build-source-contrail-web-core \
-	build-source-contrail-web-controller \
-	build-source-contrail \
-	build-source-contrail-vrouter-dpdk \
-	build-source-ifmap-server \
-	build-source-neutron-plugin-contrail \
-	build-source-ceilometer-plugin-contrail \
-	build-source-contrail-heat
+build-source: $(BUILD_ALL_SOURCE)
 
 fetch-third-party:
-	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src/third_party --rm=true build-$(OS)-$(DIST)-$(ARCH) python fetch_packages.py
+	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src/third_party --rm=true build-$(OS)-$(DIST)-$(ARCH) $(PYTHON_VERSION) fetch_packages.py
 	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src/contrail-webui-third-party --rm=true build-$(OS)-$(DIST)-$(ARCH) python fetch_packages.py -f packages.xml
 	rm -rf src/contrail-web-core/node_modules
 	mkdir src/contrail-web-core/node_modules
@@ -68,15 +87,7 @@ build-source-%:
 	(rm -f src/build/packages/${PACKAGE}_* || true)
 	docker run -u 1000 -t -v $(CWD):$(CWD) -w $(CWD)/src --rm=true build-$(OS)-$(DIST)-$(ARCH) make -f packages.make source-package-${PACKAGE}
 
-build-binary: \
-	build-binary-contrail-web-core \
-	build-binary-contrail-web-controller \
-	build-binary-contrail \
-	build-binary-contrail-vrouter-dpdk \
-	build-binary-ifmap-server \
-	build-binary-neutron-plugin-contrail \
-	build-binary-ceilometer-plugin-contrail \
-	build-binary-contrail-heat
+build-binary: $(BUILD_ALL_BINARY)
 
 build-binary-%:
 	$(eval PACKAGE := $(patsubst build-binary-%,%,$@))
