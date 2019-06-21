@@ -75,6 +75,7 @@ RUN apt-get update && apt-get install -y \
         libsasl2-dev \
         liblz4-dev \
         librdkafka-dev \
+        libnuma-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN useradd -s /bin/bash --uid $JENKINS_UID -m jenkins
