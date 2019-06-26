@@ -44,6 +44,7 @@ try {
 // Define global variables
 def timestamp = common.getDatetime()
 def version = SOURCE_BRANCH.replace('R', '') + "~${timestamp}"
+def python_version = 'python'
 if (SOURCE_BRANCH == "master")
     version = "666~${timestamp}"
 String buildName = env.BUILD_NAME
@@ -109,6 +110,11 @@ if (SOURCE_BRANCH ==~ /^R5\..*/) {
     components.add(["contrail-analytics", "src/contrail-analytics", SOURCE_BRANCH])
     components.add(["contrail-api-client", "src/contrail-api-client", SOURCE_BRANCH])
     components.add(["contrail-common", "src/contrail-common", SOURCE_BRANCH])
+}
+
+// R5.1 use python3 for fetching packages, so we need to enforce python version based on OC version
+if (SOURCE_BRANCH == 'R5.1') {
+    python_version = 'python3'
 }
 
 def inRepos = [
@@ -307,7 +313,7 @@ node('docker') {
                 }
 
                 img.inside {
-                    sh("cd src/third_party; python fetch_packages.py")
+                    sh("cd src/third_party; ${python_version} fetch_packages.py")
                     sh("cd src/contrail-webui-third-party; python fetch_packages.py -f packages.xml")
     	        sh("rm -rf src/contrail-web-core/node_modules")
             	sh("mkdir src/contrail-web-core/node_modules")
