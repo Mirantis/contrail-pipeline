@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat
 common = new com.mirantis.mk.Common()
 gerrit = new com.mirantis.mk.Gerrit()
 git = new com.mirantis.mk.Git()
-openstack = new com.mirantis.mk.Openstack()
+mkOpenstack = new com.mirantis.mk.Openstack()
 salt = new com.mirantis.mk.Salt()
 python = new com.mirantis.mk.Python()
 mirror = new com.mirantis.mk.Mirror()
@@ -262,6 +262,45 @@ timeout(time: 8, unit: 'HOURS') {
             ]
 
             if (OPENSTACK_ENABLED.toBoolean() == true) {
+                // Temporary workaround for PROD-31402, PROD-25619
+                stage('Configure routing'){
+                    // Configure OpenStack credentials
+                    dir("${workspace}/mcp-env/pipelines") {
+                        checkout([ $class: 'GitSCM',
+                            branches: [ [name: 'FETCH_HEAD'], ],
+                            userRemoteConfigs: [
+                                [url: 'ssh://gerrit.mcp.mirantis.com:29418/mcp-env/pipelines',
+                                refspec: 'master',
+                                credentialsId: 'gerrit'],
+                            ],
+                        ])
+                        mirantisClouds = readYaml(file: 'clouds.yaml')
+                        // Configure OpenStack credentials
+                        if (mirantisClouds.clouds.containsKey(openstackEnvironment)) {
+                            openstackCredentialsId = mirantisClouds.clouds."${openstackEnvironment}".jenkins_credentials_with_user_pass
+                        } else {
+                            error("There is no configuration for ${openstackEnvironment} underlay OpenStack in clouds.yaml")
+                        }
+                        withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: openstackCredentialsId,
+                            usernameVariable: 'OS_USERNAME', passwordVariable: 'OS_PASSWORD'], ]) {
+                                env.OS_USERNAME = OS_USERNAME
+                                env.OS_PASSWORD = OS_PASSWORD
+                        }
+                        env.OS_PROJECT_NAME = projectName
+                        env.OS_CLOUD = openstackEnvironment
+
+                        // Add routes for env router
+                        openstack = 'set +x; venv/bin/openstack '
+                        sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
+                        routerName = sh(script: "$openstack stack resource show $stackName mcp_router -f json -c attributes | jq -r '.attributes.router_name'", returnStdout: true).trim()
+                        sh(script: "$openstack router set --route destination=10.255.255.131/32,gateway=10.10.0.131 $routerName")
+                        sh(script: "$openstack router set --route destination=10.130.0.0/16,gateway=10.10.0.131 $routerName")
+                    }
+                    // Add route to Public net (floating ips) from proxy nodes:
+                    salt.cmdRun(saltMaster, 'prx*', 'route add -net 10.130.0.0/16 gw 10.13.0.131 || true')
+                    // Add route to lo interface of vMX from network nodes:
+                    salt.cmdRun(saltMaster, 'ntw*', 'route add -host 10.255.255.131/32 gw 10.11.0.131 || true')
+                }
                 // Temporary workaround for PROD-24982
                 stage('Run tests (tempest)'){
                     def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tempest"
