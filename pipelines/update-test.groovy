@@ -276,22 +276,11 @@ timeout(time: 8, unit: 'HOURS') {
                     booleanParam(name: 'FAIL_ON_TESTS', value: true),
             ]
 
-            // Temporary workaround for PROD-24982
-            stage('Run tests against initial env (tempest)') {
+            stage('Run tests against initial env') {
                 def testModel = "initial_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}_tempest"
                 def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
                         '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
-                        '|^tempest.api.object_storage*'
-                testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                        string(name: 'TEST_MODEL', value: "${testModel}") +
-                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
-                        wait: true,
-                )
-                testResult = testBuild.result
-            }
-            stage('Run tests against initial env (tungsten)') {
-                def testModel = "initial_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}_tungsten"
-                def testPattern = '^tungsten_tempest_plugin*'
+                        '|^tempest.api.object_storage*|^tungsten_tempest_plugin*'
                 testBuild = build(job: stackTestJob, parameters: testBuildParams +
                         string(name: 'TEST_MODEL', value: "${testModel}") +
                         string(name: 'TEST_PATTERN', value: "${testPattern}"),
@@ -356,22 +345,11 @@ timeout(time: 8, unit: 'HOURS') {
                 ])
             }
 
-            // Temporary workaround for PROD-24982
-            stage('Run tests against updated env (tempest)') {
+            stage('Run tests against updated env') {
                 def testModel = "updated_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}_tempest"
                 def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
                         '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
-                        '|^tempest.api.object_storage*'
-                testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                        string(name: 'TEST_MODEL', value: "${testModel}") +
-                        string(name: 'TEST_PATTERN', value: "${testPattern}"),
-                        wait: true,
-                )
-                testResult = testBuild.result
-            }
-            stage('Run tests against updated env (tungsten)') {
-                def testModel = "updated_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}_tungsten"
-                def testPattern = '^tungsten_tempest_plugin*'
+                        '|^tempest.api.object_storage*|^tungsten_tempest_plugin*'
                 testBuild = build(job: stackTestJob, parameters: testBuildParams +
                         string(name: 'TEST_MODEL', value: "${testModel}") +
                         string(name: 'TEST_PATTERN', value: "${testPattern}"),

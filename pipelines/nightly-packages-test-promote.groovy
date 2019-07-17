@@ -301,26 +301,15 @@ timeout(time: 8, unit: 'HOURS') {
                     // Add route to lo interface of vMX from network nodes:
                     salt.cmdRun(saltMaster, 'ntw*', 'route add -host 10.255.255.131/32 gw 10.11.0.131 || true')
                 }
-                // Temporary workaround for PROD-24982
                 stage('Run tests (tempest)'){
                     def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tempest"
                     def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
                             '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
-                            '|^tempest.api.object_storage*'
+                            '|^tempest.api.object_storage*|^tungsten_tempest_plugin*'
                     testBuild = build(job: stackTestJob, parameters: testBuildParams +
                             string(name: 'TEST_MODEL', value: "${testModel}") +
                             string(name: 'TEST_PATTERN', value: "${testPattern}"),
                         wait: true,
-                    )
-                    testResult = testBuild.result
-                }
-                stage('Run tests (tungsten)'){
-                    def testModel = "oc${env.OPENCONTRAIL_VERSION.replaceAll(/\./, '')}_${env.MCP_VERSION}_tungsten"
-                    def testPattern = '^tungsten_tempest_plugin*'
-                    testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                            string(name: 'TEST_MODEL', value: "${testModel}") +
-                            string(name: 'TEST_PATTERN', value: "${testPattern}"),
-                            wait: true,
                     )
                     testResult = testBuild.result
                 }
