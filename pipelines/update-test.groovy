@@ -276,6 +276,45 @@ timeout(time: 8, unit: 'HOURS') {
                     booleanParam(name: 'FAIL_ON_TESTS', value: true),
             ]
 
+            stage('Configure routing'){
+                // Configure OpenStack credentials
+                dir("${workspace}/mcp-env/pipelines") {
+                    checkout([ $class: 'GitSCM',
+                        branches: [ [name: 'FETCH_HEAD'], ],
+                        userRemoteConfigs: [
+                            [url: 'ssh://gerrit.mcp.mirantis.com:29418/mcp-env/pipelines',
+                            refspec: 'master',
+                            credentialsId: 'gerrit'],
+                        ],
+                    ])
+                    mirantisClouds = readYaml(file: 'clouds.yaml')
+                    // Configure OpenStack credentials
+                    if (mirantisClouds.clouds.containsKey(openstackEnvironment)) {
+                        openstackCredentialsId = mirantisClouds.clouds."${openstackEnvironment}".jenkins_credentials_with_user_pass
+                    } else {
+                        error("There is no configuration for ${openstackEnvironment} underlay OpenStack in clouds.yaml")
+                    }
+                    withCredentials([[$class: 'UsernamePasswordMultiBinding', credentialsId: openstackCredentialsId,
+                        usernameVariable: 'OS_USERNAME', passwordVariable: 'OS_PASSWORD'], ]) {
+                            env.OS_USERNAME = OS_USERNAME
+                            env.OS_PASSWORD = OS_PASSWORD
+                    }
+                    env.OS_PROJECT_NAME = projectName
+                    env.OS_CLOUD = openstackEnvironment
+
+                    // Add routes for env router
+                    openstack = 'set +x; venv/bin/openstack '
+                    sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
+                    routerName = sh(script: "$openstack stack resource show $stackName mcp_router -f json -c attributes | jq -r '.attributes.router_name'", returnStdout: true).trim()
+                    sh(script: "$openstack router set --route destination=10.255.255.131/32,gateway=10.10.0.131 $routerName")
+                    sh(script: "$openstack router set --route destination=10.130.0.0/16,gateway=10.13.0.131 $routerName")
+                }
+                // Add route to Public net (floating ips) from proxy nodes:
+                salt.cmdRun(saltMaster, 'prx*', 'route add -net 10.130.0.0/16 gw 10.13.0.131 || true')
+                // Add route to lo interface of vMX from network nodes:
+                salt.cmdRun(saltMaster, 'ntw*', 'route add -host 10.255.255.131/32 gw 10.11.0.131 || true')
+            }
+
             stage('Run tests against initial env') {
                 def testModel = "initial_cookied_oc${testContextYaml.default_context.opencontrail_version.replaceAll(/\./, '')}_tempest"
                 def testPattern = '^tungsten_tempest_plugin*|^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
