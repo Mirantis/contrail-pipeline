@@ -306,13 +306,10 @@ timeout(time: 8, unit: 'HOURS') {
                     openstack = 'set +x; venv/bin/openstack '
                     sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
                     routerName = sh(script: "$openstack stack resource show $stackName mcp_router -f json -c attributes | jq -r '.attributes.router_name'", returnStdout: true).trim()
-                    sh(script: "$openstack router set --route destination=10.255.255.131/32,gateway=10.10.0.131 $routerName")
-                    sh(script: "$openstack router set --route destination=10.130.0.0/16,gateway=10.13.0.131 $routerName")
+                    sh(script: "$openstack router set --route destination=10.130.128.0/17,gateway=10.10.0.131 $routerName")
                 }
-                // Add route to Public net (floating ips) from proxy nodes:
-                salt.cmdRun(saltMaster, 'prx*', 'route add -net 10.130.0.0/16 gw 10.13.0.131 || true')
-                // Add route to lo interface of vMX from network nodes:
-                salt.cmdRun(saltMaster, 'ntw*', 'route add -host 10.255.255.131/32 gw 10.11.0.131 || true')
+                // Add route to Public net (floating ips):
+                salt.cmdRun(saltMaster, 'сfg*', 'route add -net 10.130.128.0/17 gw 10.10.0.131 || true')
             }
 
             stage('Run tests against initial env') {
