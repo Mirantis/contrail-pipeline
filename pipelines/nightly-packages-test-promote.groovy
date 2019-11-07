@@ -34,7 +34,7 @@ gerritProtocol = 'https'
 // test parameters
 def stackTestJob = 'ci-contrail-tempest-runner'
 def testConcurrency = '2'
-def testPassThreshold = '90'
+def testPassThreshold = '95'
 def testConf = '/home/rally/rally_reports/tempest_generated.conf'
 def testTarget = 'cfg01*'
 def openstackEnvironment = 'internal_cloud_v2_us'
@@ -256,8 +256,7 @@ timeout(time: 8, unit: 'HOURS') {
                     string(name: 'TEST_PASS_THRESHOLD', value: testPassThreshold),
                     booleanParam(name: 'DELETE_STACK', value: false),
                     booleanParam(name: 'TESTRAIL', value: true),
-                    string(name: 'TEST_MILESTONE', value: "${testMilestone}"),
-                    string(name: 'TEST_PLAN', value: "${testPlan}"),
+                    string(name: 'TESTRAIL_PLAN', value: "${testPlan}"),
                     booleanParam(name: 'FAIL_ON_TESTS', value: true),
             ]
 
@@ -303,8 +302,13 @@ timeout(time: 8, unit: 'HOURS') {
                     def testPattern = '^heat_tempest_plugin.tests*|^tempest.api.image*|^tempest_horizon*' +
                             '|^tempest.api.identity*|^tempest.api.network*|^tempest.api.compute*|^tempest.api.volume*|^tempest.scenario*' +
                             '|^tempest.api.object_storage*|^tungsten_tempest_plugin*'
+                    def tr_suite = "[${testMilestone}_" + env.OPENSTACK_VERSION.toUpperCase() + "]Tempest"
+                    def tr_conf = "{'Contrail':'OC ${env.OPENCONTRAIL_VERSION}'}"
                     testBuild = build(job: stackTestJob, parameters: testBuildParams +
-                            string(name: 'TEST_MODEL', value: "${testModel}") +
+                            string(name: 'TESTRAIL_MILESTONE', value: "${testMilestone}") +
+                            string(name: 'TESTRAIL_RUN', value: "${testModel}") +
+                            string(name: 'TESTRAIL_SUITE', value: "${tr_suite}") +
+                            string(name: 'TESTRAIL_CONFIGURATION', value: "${tr_conf}") +
                             string(name: 'TEST_PATTERN', value: "${testPattern}"),
                         wait: true,
                     )

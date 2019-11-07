@@ -26,10 +26,16 @@
  *   TEST_PATTERN                 Tempest tests pattern
  *   TEST_CONCURRENCY             How much tempest threads to run
  *   TESTRAIL                     Whether upload results to testrail or not
- *   TEST_MILESTONE               Product version for tests
+ *   TESTRAIL_REPORTER_IMG        Docker image with reporter
+ *   TESTRAIL_QA_CREDENTIALS      Credentials of TestRail user
+ *   TESTRAIL_PROJECT             TestRail Project name
+ *   TESTRAIL_PLAN                TestRail Test Plan name
+ *   TESTRAIL_RUN                 TestRail Test Run name
+ *   TESTRAIL_SUITE               TestRail Test Suite name
+ *   TESTRAIL_MILESTONE           TestRail Milestone name
+ *   TESTRAIL_CONFIGURATION       TestRail configration for test plan entry
  *   TEST_MODEL                   Salt model used in environment
  *   OPENSTACK_VERSION            Version of Openstack being tested
- *   PROC_RESULTS_JOB             Name of job for test results processing
  *   FAIL_ON_TESTS                Whether to fail build on tests failures or not
  *   TEST_PASS_THRESHOLD          Persent of passed tests to consider build successful
  *   SLAVE_NODE                   Label or node name where the job will be run
@@ -205,24 +211,44 @@ def runTempestTestsNew(master, target, dockerImageLink, args = '', localLogDir='
  * @param target              Target node to install docker pkg
  * @param reportsDir          Source directory to archive
  */
-def archiveTestArtifacts(master, target, reportsDir='/root/test', outputFile='test.tar') {
-    def salt = new com.mirantis.mk.Salt()
-
-    def artifacts_dir = '_artifacts/'
-
+def archiveTestArtifacts(master, target, artifacts_dir, reportsDir='/root/test', outputFile='test.tar') {
     salt.cmdRun(master, target, "tar --exclude='env' -cf /root/${outputFile} -C ${reportsDir} .")
-    sh "mkdir -p ${artifacts_dir}"
-
     encoded = salt.cmdRun(master, target, "cat /root/${outputFile}", true, null, false)['return'][0].values()[0].replaceAll('Salt command execution success', '')
-    writeFile file: "${artifacts_dir}${outputFile}", text: encoded
-
     // collect artifacts
-    archiveArtifacts artifacts: "${artifacts_dir}${outputFile}"
+    dir(artifacts_dir) {
+        writeFile file: "${outputFile}", text: encoded
+        archiveArtifacts artifacts: "${outputFile}"
+        sh 'tar -xf *.tar'
+        junit healthScaleFactor: 0.0, testResults: '*.xml'
+    }
+}
+
+def uploadResultsTestrail(report, image, credentialsId, project, plan, run, suite, milestone=null, configuration=null, url="https://mirantis.testrail.com", master=null, target='cfg01*') {
+    creds = common.getPasswordCredentials(credentialsId)
+    command =  "docker run --rm --net=host " +
+               "-v ${report}:/tmp/report.xml " +
+               "-e TESTRAIL_URL=${url} " +
+               "-e TESTRAIL_USER=${creds.username} " +
+               "-e TESTRAIL_PASSWORD=${creds.password.toString()} " +
+               "${image} " +
+               "python reporter.py upload /tmp/report.xml -p \"${project}\" -t \"${plan}\" -r \"${run}\" -s \"${suite}\""
+    if (milestone != null) {
+        command = command + " -m \"${milestone}\""
+    }
+    if (configuration != null) {
+        command = command + " -c \"${configuration}\""
+    }
+    command = command + " --remove-untested"
+    if (master == null) {
+      sh(command)
+    } else {
+      salt.cmdRun(master, target, command)
+    }
 }
 
 // Define global variables
 def saltMaster
-def slave_node = 'python'
+def slave_node = 'python,docker'
 
 if (common.validInputParam('SLAVE_NODE')) {
     slave_node = SLAVE_NODE
@@ -242,8 +268,8 @@ timeout(time: 6, unit: 'HOURS') {
         }
 
         def log_dir = '/root/tempest/'
-
         def reports_dir = '/root/test/'
+        def artifacts_dir = sh(script: 'mktemp -d', returnStdout: true).trim()
 
         def date = sh(script: 'date +%Y-%m-%d', returnStdout: true).trim()
         def test_log_dir = "/var/log/${test_type}"
@@ -379,31 +405,63 @@ timeout(time: 6, unit: 'HOURS') {
             }
 
             stage('Archive Test artifacts') {
-                archiveTestArtifacts(saltMaster, TEST_TARGET, reports_dir)
+                def artifacts_dir = sh(script: 'mktemp -d', returnStdout: true).trim()
+                archiveTestArtifacts(saltMaster, TEST_TARGET, artifacts_dir, reports_dir)
             }
 
             salt.runSaltProcessStep(saltMaster, TEST_TARGET, 'file.mkdir', ["${test_log_dir}"])
             salt.runSaltProcessStep(saltMaster, TEST_TARGET, 'file.move', ["${reports_dir}", "${test_log_dir}/${test_dir}-${date}"])
             salt.fullRefresh(saltMaster, '*')
 
-            stage('Processing results') {
-                build(job: PROC_RESULTS_JOB, parameters: [
-                    [$class: 'StringParameterValue', name: 'TARGET_JOB', value: "${env.JOB_NAME}"],
-                    [$class: 'StringParameterValue', name: 'TARGET_BUILD_NUMBER', value: "${env.BUILD_NUMBER}"],
-                    [$class: 'BooleanParameterValue', name: 'TESTRAIL', value: testrail.toBoolean()],
-                    [$class: 'StringParameterValue', name: 'TEST_MILESTONE', value: test_milestone],
-                    [$class: 'StringParameterValue', name: 'TEST_MODEL', value: test_model],
-                    [$class: 'StringParameterValue', name: 'TEST_PLAN', value: test_plan],
-                    [$class: 'StringParameterValue', name: 'OPENSTACK_VERSION', value: openstack_version],
-                    [$class: 'StringParameterValue', name: 'TEST_DATE', value: date],
-                    [$class: 'StringParameterValue', name: 'TEST_PASS_THRESHOLD', value: TEST_PASS_THRESHOLD],
-                    [$class: 'BooleanParameterValue', name: 'FAIL_ON_TESTS', value: FAIL_ON_TESTS.toBoolean()]
-                ])
+            def report = sh(script: "find ${artifacts_dir} -name *.xml", returnStdout: true).trim()
+
+            stage ('Upload test results to TestRail') {
+                uploadResultsTestrail(report, TESTRAIL_REPORTER_IMG, TESTRAIL_QA_CREDENTIALS, TESTRAIL_PROJECT, TESTRAIL_PLAN, TESTRAIL_RUN, TESTRAIL_SUITE, TESTRAIL_MILESTONE, TESTRAIL_CONFIGURATION)
+            }
+
+            stage('Check tests results') {
+                def fileContents = sh(script: "cat ${report}", returnStdout: true).trim()
+                def parsed = new XmlParser().parseText(fileContents)
+                def res
+                if (parsed.get('testsuite')){
+                    res = parsed['testsuite'][0].attributes()
+                } else {
+                    res = parsed.attributes()
+                }
+
+                def failed = res.failures.toInteger()
+                def tests = res.tests.toInteger()
+                def errors = res.errors.toInteger()
+                def skipped
+                if (res.get('skipped')) {
+                    skipped = res.skipped.toInteger()
+                } else {
+                    skipped = res.skips.toInteger()
+                }
+                def passed = tests - failed - skipped - errors
+
+                def pr = (passed / (tests - skipped)) * 100
+
+                println("""\
+                        Failed:  ${res.failures}
+                        Errors:  ${res.errors}
+                        Skipped: ${skipped}
+                        Tests:   ${res.tests}
+                        TESTS PASS RATE: ${pr}%
+                        """)
+
+                if (pr < TEST_PASS_THRESHOLD.toInteger() && FAIL_ON_TESTS.toBoolean()){
+                    error("Pass rate ${pr}% is lower than pass threshold ${TEST_PASS_THRESHOLD}%")
+                }
             }
 
         } catch (Exception e) {
             currentBuild.result = 'FAILURE'
             throw e
+        } finally {
+            dir(artifacts_dir) {
+              deleteDir()
+            }
         }
     }
 }
