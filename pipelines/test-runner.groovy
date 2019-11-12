@@ -34,7 +34,6 @@
  *   TESTRAIL_SUITE               TestRail Test Suite name
  *   TESTRAIL_MILESTONE           TestRail Milestone name
  *   TESTRAIL_CONFIGURATION       TestRail configration for test plan entry
- *   TEST_MODEL                   Salt model used in environment
  *   OPENSTACK_VERSION            Version of Openstack being tested
  *   FAIL_ON_TESTS                Whether to fail build on tests failures or not
  *   TEST_PASS_THRESHOLD          Persent of passed tests to consider build successful
@@ -276,8 +275,6 @@ timeout(time: 6, unit: 'HOURS') {
         def testrail = false
         def args = ''
         def test_pattern = '^tungsten_tempest_plugin*|smoke'
-        def test_milestone = ''
-        def test_model = ''
         def venv = "${env.WORKSPACE}/venv"
         def test_concurrency = '0'
         def use_pepper = true
@@ -291,12 +288,8 @@ timeout(time: 6, unit: 'HOURS') {
 
             if (common.validInputParam('TESTRAIL') && TESTRAIL.toBoolean()) {
                 testrail = true
-                if (common.validInputParam('TEST_MILESTONE') && common.validInputParam('TEST_MODEL')) {
-                    test_milestone = TEST_MILESTONE
-                    test_model = TEST_MODEL
-                    test_plan = TEST_PLAN
-                } else {
-                    error('WHEN UPLOADING RESULTS TO TESTRAIL TEST_MILESTONE, TEST_MODEL AND TEST_PLAN MUST BE SET')
+                if (!common.validInputParam('TESTRAIL_PLAN') && !common.validInputParam('TESTRAIL_RUN') && !common.validInputParam('TESTRAIL_SUITE')) {
+                    error('WHEN UPLOADING RESULTS TO TESTRAIL, TESTRAIL_PLAN, TESTRAIL_RUN AND TESTRAIL_SUITE MUST BE SET')
                 }
             }
 
