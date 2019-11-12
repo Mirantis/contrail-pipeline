@@ -405,7 +405,6 @@ timeout(time: 6, unit: 'HOURS') {
             }
 
             stage('Archive Test artifacts') {
-                def artifacts_dir = sh(script: 'mktemp -d', returnStdout: true).trim()
                 archiveTestArtifacts(saltMaster, TEST_TARGET, artifacts_dir, reports_dir)
             }
 
