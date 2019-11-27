@@ -311,8 +311,13 @@ timeout(time: 8, unit: 'HOURS') {
                             string(name: 'TESTRAIL_CONFIGURATION', value: "${tr_conf}") +
                             string(name: 'TEST_PATTERN', value: "${testPattern}"),
                         wait: true,
+                        propagate: false,
                     )
-                    testResult = testBuild.result
+                    if ((testBuild.result == 'SUCCESS') || (testBuild.result == 'UNSTABLE')) {
+                        testResult = 'SUCCESS'
+                    } else {
+                        error('Test result is failed.')
+                    }
                 }
             } else if (KUBERNETES_ENABLED.toBoolean() == true) {
 
