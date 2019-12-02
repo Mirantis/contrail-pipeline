@@ -50,6 +50,9 @@ node('jsl07.mcp.mirantis.net') {
               '''
             }
 
+            writeFile file: "tf-dev-env/buildpipeline.env",
+                text: "GERRIT_PROJECT=${GERRIT_PROJECT}\n" \
+                    + "GERRIT_REFSPEC=${GERRIT_REFSPEC}\n"
             stage("sync") {
                 // TODO: checkout contrail-vnc before sync and checkout
                 //  if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
@@ -67,18 +70,21 @@ node('jsl07.mcp.mirantis.net') {
             stage("checkout") {
               sh '''
                   if [ -n "${GERRIT_PROJECT}" ]; then
-                      # TODO excluding tf-dev-env, contrail-vnc, contrail-packages, contrail-container-builder
-                      docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${GERRIT_PROJECT##*/} ${GERRIT_CHANGE_NUMBER}/${GERRIT_PATCHSET_NUMBER}
-                      if echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:'; then
-                          DEP_URL_LIST=$(echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:' | sed -r 's|/+$||g' | egrep -o '[^ ]+$')
-                          for DEP_URL in ${DEP_URL_LIST}; do
-                              DEP_PROJECT_URL="${DEP_URL%/+/*}"
-                              DEP_PROJECT="${DEP_PROJECT_URL##*/}"
-                              DEP_CHANGE_ID="${DEP_URL##*/}"
-                              docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${DEP_PROJECT} ${DEP_CHANGE_ID}
-                          done
+                      if [ "${GERRIT_PROJECT##*/}" != "tf-dev-env" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-vnc" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-container-builder" ]; then
+                          docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${GERRIT_PROJECT##*/} ${GERRIT_CHANGE_NUMBER}/${GERRIT_PATCHSET_NUMBER}
+                          if echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:'; then
+                              DEP_URL_LIST=$(echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:' | sed -r 's|/+$||g' | egrep -o '[^ ]+$')
+                              for DEP_URL in ${DEP_URL_LIST}; do
+                                  DEP_PROJECT_URL="${DEP_URL%/+/*}"
+                                  DEP_PROJECT="${DEP_PROJECT_URL##*/}"
+                                  DEP_CHANGE_ID="${DEP_URL##*/}"
+                                  docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${DEP_PROJECT} ${DEP_CHANGE_ID}
+                              done
+                          else
+                              echo "There are no depends-on"
+                          fi
                       else
-                          echo "There are no depends-on"
+                          echo "Skipping checkout because GERRIT_PROJECT is ${GERRIT_PROJECT}."
                       fi
                   else
                       echo "Skipping checkout because GERRIT_PROJECT does not specified"
