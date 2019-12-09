@@ -41,9 +41,12 @@ node('jsl07.mcp.mirantis.net') {
               currentBuild.description = "${SRCVER}"
               sh '''
                   sudo rm -rf *
-                  #TODO parametrize tf-dev-env and add checkout from change request
-                  git clone https://github.com/mrasskazov/tf-dev-env.git -b mcp/R5.1
+                  git clone https://gerrit.mcp.mirantis.com/tungsten/tf-dev-env -b mcp/R5.1
                   cd tf-dev-env
+                  if [ "${GERRIT_PROJECT##*/}" = "tf-dev-env" ]; then
+                      git fetch $(git remote -v | awk '/^origin.*fetch/ {print $2}') ${GERRIT_REFSPEC:?GERRIT_REFSPEC is empty} > /dev/null \
+                        && git checkout FETCH_HEAD > /dev/null
+                  fi
                   echo "Using tf-dev-env version"
                   git log --decorate -n1
                   ./build.sh
