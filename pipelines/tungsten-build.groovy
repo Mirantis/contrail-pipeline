@@ -57,15 +57,11 @@ node('jsl07.mcp.mirantis.net') {
                 text: "GERRIT_PROJECT=${GERRIT_PROJECT}\n" \
                     + "GERRIT_REFSPEC=${GERRIT_REFSPEC}\n"
             stage("sync") {
-                // TODO: checkout contrail-vnc before sync and checkout
-                //  if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
-                //       checkout contrail-vnc
-                //  fi
-                //#cd $HOME
-                //#rm -rf .repo
-                //#repo init --no-clone-bundle -q -u https://github.com/mrasskazov/contrail-vnc -b $BRANCH                                         | 22     chmod a+x /usr/bin/repo && \
-
               sh '''
+                if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
+                    VNC_REVISION=${GERRIT_REFSPEC}
+                fi
+                docker exec tf-developer-sandbox repo init --no-clone-bundle -q -u https://gerrit.mcp.mirantis.com/tungsten/contrail-vnc -b ${VNC_REVISION:-${VNC_BRANCH}}
                 docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory sync
               '''
             }
