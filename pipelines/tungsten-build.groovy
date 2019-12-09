@@ -54,8 +54,8 @@ node('jsl07.mcp.mirantis.net') {
             }
 
             writeFile file: "tf-dev-env/buildpipeline.env",
-                text: "GERRIT_PROJECT=${GERRIT_PROJECT}\n" \
-                    + "GERRIT_REFSPEC=${GERRIT_REFSPEC}\n"
+                text: "GERRIT_PROJECT=${env.GERRIT_PROJECT}\n" \
+                    + "GERRIT_REFSPEC=${env.GERRIT_REFSPEC}\n"
             stage("sync") {
               sh '''
                 if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
