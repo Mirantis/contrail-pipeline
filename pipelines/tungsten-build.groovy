@@ -13,10 +13,11 @@ def dockerLib = new com.mirantis.mk.Docker()
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
 def artifactoryUrl = server.getUrl()
-def dockerDevRepo = 'docker-test-local'
-def dockerDevRegistry = "${dockerDevRepo}.docker.mirantis.net"
+def pubRegistry = env.PUB_REGISTRY ?:'docker-dev-local.docker.mirantis.net/tungsten'
+def dockerDevRepo = "${pubRegistry.tokenize('.')[0]}"
+def dockerDevRegistry = "${pubRegistry.tokenize('/')[0]}"
 
-imageNameSpace = "tungsten"
+imageNameSpace = pubRegistry.replaceFirst("${dockerDevRegistry}/", '')
 publishRetryAttempts = 10
 
 //node('docker') {
@@ -38,7 +39,6 @@ node('jsl07.mcp.mirantis.net') {
         ]) {
 
             stage("prepare") {
-              currentBuild.description = "${SRCVER}"
               sh '''
                   sudo rm -rf *
                   git clone https://gerrit.mcp.mirantis.com/tungsten/tf-dev-env -b mcp/R5.1
@@ -173,6 +173,9 @@ node('jsl07.mcp.mirantis.net') {
                             dir ("../" + containerBuilderDir + "/containers/") {
                                 containerLogList = findFiles (glob: "build-*.log")
                             }
+                            currentBuild.description = "[<a href=\"https://${dockerDevRegistry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${imageNameSpace}\">tree</a>]"
+                            def descJson = '{"packagePayload":[{"id":"dockerV2Tag","values":["' + "${SRCVER}" + '"]}],"selectedPackageType":{"id":"dockerV2","icon":"docker","displayName":"Docker"}}'
+                            currentBuild.description = "<a href=\"https://docker-test-local.docker.mirantis.net/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
                             brokenList = containerLogList.collect {
                                 it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
                             }
