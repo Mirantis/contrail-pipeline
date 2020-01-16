@@ -175,7 +175,7 @@ node('jsl07.mcp.mirantis.net') {
                             }
                             currentBuild.description = "[<a href=\"https://${dockerDevRegistry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${imageNameSpace}\">tree</a>]"
                             def descJson = '{"packagePayload":[{"id":"dockerV2Tag","values":["' + "${SRCVER}" + '"]}],"selectedPackageType":{"id":"dockerV2","icon":"docker","displayName":"Docker"}}'
-                            currentBuild.description = "<a href=\"https://docker-test-local.docker.mirantis.net/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
+                            currentBuild.description = "<a href=\"https://${dockerDevRegistry}/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
                             brokenList = containerLogList.collect {
                                 it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
                             }
