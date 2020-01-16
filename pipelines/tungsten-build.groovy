@@ -194,6 +194,7 @@ node('jsl07.mcp.mirantis.net') {
                                             dockerDevRepo)
                                         sh "docker rmi ${pubTag}"
                                     }
+                                    sh "echo '${pubTag}' >> ${WORKSPACE}/image-list.txt"
                                 }
                             }
                         }
@@ -202,6 +203,7 @@ node('jsl07.mcp.mirantis.net') {
             }
 
             stage("Process results") {
+                archiveArtifacts artifacts: 'image-list.txt'
                 if(!brokenList.isEmpty()) {
                     common.errorMsg("Failed to build some containers:\n${brokenList}\nSee log files at artifacts")
                     archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
