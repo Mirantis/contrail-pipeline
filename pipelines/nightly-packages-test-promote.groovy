@@ -288,9 +288,10 @@ timeout(time: 8, unit: 'HOURS') {
                         env.OS_PROJECT_NAME = projectName
                         env.OS_CLOUD = openstackEnvironment
 
+                        mkOpenstack.setupOpenstackVirtualenv('venv', 'latest')
+
                         // Add routes for env router
-                        openstack = 'set +x; venv/bin/openstack '
-                        sh 'virtualenv venv; venv/bin/pip install python-openstackclient python-heatclient'
+                        openstack = 'venv/bin/openstack '
                         routerName = sh(script: "$openstack stack resource show $stackName mcp_router -f json -c attributes | jq -r '.attributes.router_name'", returnStdout: true).trim()
                         sh(script: "$openstack router set --route destination=10.130.128.0/17,gateway=10.10.0.131 $routerName")
                     }
