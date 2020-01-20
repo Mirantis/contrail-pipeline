@@ -408,7 +408,13 @@ timeout(time: 6, unit: 'HOURS') {
             def report = sh(script: "find ${artifacts_dir} -name *.xml", returnStdout: true).trim()
 
             stage ('Upload test results to TestRail') {
-                uploadResultsTestrail(report, TESTRAIL_REPORTER_IMG, TESTRAIL_QA_CREDENTIALS, TESTRAIL_PROJECT, TESTRAIL_PLAN, TESTRAIL_RUN, TESTRAIL_SUITE, TESTRAIL_MILESTONE, TESTRAIL_CONFIGURATION)
+                try {
+                    common.retry(3, 180){
+                        uploadResultsTestrail(report, TESTRAIL_REPORTER_IMG, TESTRAIL_QA_CREDENTIALS, TESTRAIL_PROJECT, TESTRAIL_PLAN, TESTRAIL_RUN, TESTRAIL_SUITE, TESTRAIL_MILESTONE, TESTRAIL_CONFIGURATION)
+                    }
+                } catch (Exception e) {
+                    common.errorMsg('Results was not uploud to testrail')
+                }
             }
 
             stage('Check tests results') {
