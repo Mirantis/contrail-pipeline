@@ -14,11 +14,19 @@ def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
 def artifactoryUrl = server.getUrl()
 def pubRegistry = env.PUB_REGISTRY ?:'docker-dev-local.docker.mirantis.net/tungsten'
+def floatingPubTag = "5.1-dev"
 def dockerDevRepo = "${pubRegistry.tokenize('.')[0]}"
 def dockerDevRegistry = "${pubRegistry.tokenize('/')[0]}"
 
 imageNameSpace = pubRegistry.replaceFirst("${dockerDevRegistry}/", '')
 publishRetryAttempts = 10
+
+def gerritChangeNum
+try {
+    gerritChangeNum = GERRIT_CHANGE_NUMBER
+} catch (MissingPropertyException e) {
+    gerritChangeNum = ""
+}
 
 //node('docker') {
 node('jsl07.mcp.mirantis.net') {
@@ -180,21 +188,28 @@ node('jsl07.mcp.mirantis.net') {
                                 it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
                             }
                             common.infoMsg("brokenList = ${brokenList}")
-                            imageList.each {
-                                if (! (it in brokenList)) {
-                                    localTag = "${CONTRAIL_REGISTRY}/${it}:${CONTRAIL_VERSION}"
-                                    pubTag="${dockerDevRegistry}/${imageNameSpace}/${it}:${SRCVER}"
-                                    sh "docker tag ${localTag} ${pubTag}"
-                                    retry(publishRetryAttempts) {
-                                        artTools.uploadImageToArtifactory(
-                                            server,
-                                            dockerDevRegistry,
-                                            "${imageNameSpace}/${it}",
-                                            "${SRCVER}",
-                                            dockerDevRepo)
-                                        sh "docker rmi ${pubTag}"
+                            imageList.each { image ->
+                                if (! (image in brokenList)) {
+                                    def localImage = "${CONTRAIL_REGISTRY}/${image}:${CONTRAIL_VERSION}"
+                                    def publishTags = ["${SRCVER}"]
+                                    // Add floating tag only in builds for merged code
+                                    if (gerritChangeNum == "") {
+                                        publishTags.add("${floatingPubTag}")
                                     }
-                                    sh "echo '${pubTag}' >> ${WORKSPACE}/image-list.txt"
+                                    publishTags.each { pTag ->
+                                        def publicImage = "${dockerDevRegistry}/${imageNameSpace}/${image}:${pTag}"
+                                        sh "docker tag ${localImage} ${publicImage}"
+                                        retry(publishRetryAttempts) {
+                                            artTools.uploadImageToArtifactory(
+                                                server,
+                                                dockerDevRegistry,
+                                                "${imageNameSpace}/${image}",
+                                                "${pTag}",
+                                                dockerDevRepo)
+                                            sh "docker rmi ${publicImage}"
+                                        }
+                                        sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
+                                    }
                                 }
                             }
                         }
