@@ -21,6 +21,16 @@ def dockerDevRegistry = "${pubRegistry.tokenize('/')[0]}"
 imageNameSpace = pubRegistry.replaceFirst("${dockerDevRegistry}/", '')
 publishRetryAttempts = 10
 
+// Artifactory related paramters
+String artifactoryRepo            = env.ARTIFACTORY_REPO ?: 'binary-dev-local'
+String artifactoryNamespace       = env.ARTIFACTORY_NAMESPACE ?: "tungsten"
+def artifactoryBuildInfo          = Artifactory.newBuildInfo()
+server.credentialsId              = env.ARTIFACTORY_CREDENTIALS_ID ?: 'artifactory'
+
+String artifactoryUploadPath      = "${artifactoryRepo}/${artifactoryNamespace}"
+String artifactoryUploadPattern   = env.ARTIFACTORY_UPLOAD_PATTERN ?: '*'
+
+
 def gerritChangeNum
 try {
     gerritChangeNum = GERRIT_CHANGE_NUMBER
@@ -58,6 +68,7 @@ node('jsl07.mcp.mirantis.net') {
                   echo "Using tf-dev-env version"
                   git log --decorate -n1
                   ./build.sh
+                  docker exec tf-developer-sandbox pip install future
               '''
             }
 
@@ -161,6 +172,24 @@ node('jsl07.mcp.mirantis.net') {
                   docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 2 containers-only deployers-only || EXIT_CODE=$?
                   #TODO: parse errors and archive logs. possible with junit
               '''
+            }
+
+            stage("contrail-api-client wheel") {
+                  sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
+                  sh "docker exec -w /root/contrail/src/contrail-api-client/base/ tf-developer-sandbox sed -i -r 's/(.*)/\\1.${timestamp}/' version.info"
+                  sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox scons"
+                  sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/ tf-developer-sandbox python setup.py bdist_wheel --universal"
+                  sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/dist/ tf-developer-sandbox ls -l"
+                  sh "ls -l contrail/src/contrail-api-client/build/debug/api-lib/dist"
+                  String uploadSpec = """{
+                    "files": [
+                      {
+                        "pattern": "contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl",
+                        "target": "${artifactoryUploadPath}/contrail-api-client/"
+                      }
+                    ]
+                  }"""
+                  artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
             }
 
 
