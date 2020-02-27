@@ -69,6 +69,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
                   echo "Using tf-dev-env version"
                   git log --decorate -n1
                   ./build.sh
+                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory clean
                   docker exec tf-developer-sandbox pip install future
               '''
             }
