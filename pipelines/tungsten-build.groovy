@@ -38,7 +38,6 @@ try {
     gerritChangeNum = ""
 }
 
-
 // use docker slaves excluding jsl09.mcp.mirantis.net host for debug
 node('docker && !jsl09.mcp.mirantis.net') {
     try{
@@ -176,6 +175,9 @@ node('docker && !jsl09.mcp.mirantis.net') {
               '''
             }
 
+            def keysArr = []
+            def valuesArr = []
+
             stage("contrail-api-client wheel") {
                   sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
                   sh "docker exec -w /root/contrail/src/contrail-api-client/base/ tf-developer-sandbox sed -i -r 's/(.*)/\\1.${timestamp}/' version.info"
@@ -183,21 +185,34 @@ node('docker && !jsl09.mcp.mirantis.net') {
                   sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/ tf-developer-sandbox python setup.py bdist_wheel --universal"
                   sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/dist/ tf-developer-sandbox ls -l"
                   sh "ls -l contrail/src/contrail-api-client/build/debug/api-lib/dist"
+                  wheelGlob = 'contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl'
+                  wheelList = findFiles (glob: wheelGlob)
                   String uploadSpec = """{
                     "files": [
                       {
-                        "pattern": "contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl",
+                        "pattern": "${wheelGlob}",
                         "target": "${artifactoryUploadPath}/contrail-api-client/"
                       }
                     ]
                   }"""
                   artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
+                  // prepare keys to artifact-metadata
+                  common.infoMsg("Prepare artifact metadate for contrail-api-client")
+                  wheelList.each { wheelFile ->
+                      keysArr.add('binary:tungsten:R51:contrail-api-client')
+                      valuesArr.add(sprintf('url: %1$s', ["${artifactoryUrl}/${artifactoryUploadPath}/contrail-api-client/${wheelFile.name}"]))
+                  }
             }
 
 
             List brokenList
             List containerLogList
             String containerBuilderDir = "src/${CANONICAL_HOSTNAME}/tungsten/contrail-container-builder"
+
+
+            def imageArtifactPath = 'metadata/images/tungsten/R51'
+            def imageArtifactTpl = '''tag: ${imageTag}
+                    url: ${imageFullUrl}'''
 
             stage("Upload images") {
                 dir("tf-dev-env") {
@@ -207,7 +222,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
                     common.infoMsg("imageList = ${imageList}")
                     docker.withRegistry("http://${dockerDevRegistry}/", 'artifactory') {
                         List commonEnv = readFile("common.env").split('\n')
-                        common.infoMsg(commonEnv)
                         withEnv(commonEnv) {
                             dir ("../" + containerBuilderDir + "/containers/") {
                                 containerLogList = findFiles (glob: "build-*.log")
@@ -240,12 +254,39 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                             sh "docker rmi ${publicImage}"
                                         }
                                         sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
+                                        if (pTag != floatingPubTag) {
+                                            // prepare keys to artifact-metadata
+                                            keysArr.add('images:tungsten:R51:' + image)
+                                            valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
+
+            Boolean publishMetadata = env.PUBLISH_METADATA ? env.PUBLISH_METADATA.toBoolean() : true
+            try {
+                stage('Publish metadata') {
+                    def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
+                    def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
+                    def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
+                    def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
+                    def releaseMetadataDirDepth = 2
+                    Map releaseMetadataParams = [
+                      'metadataCredentialsId': releaseMetadataCredentialsId,
+                      'metadataGitRepoUrl': releaseMetadataRepoUrl,
+                      'metadataGitRepoBranch': releaseMetadataGerritBranch,
+                      'crTopic': 'update-tungsten-artifacts',
+                      'comment': 'Update Tungsten Fabric artifacts',
+                    ]
+                    releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+                }
+            } catch (err) {
+                def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
+                common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
             }
 
             stage("Process results") {
