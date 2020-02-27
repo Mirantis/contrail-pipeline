@@ -145,7 +145,7 @@ node('jsl07.mcp.mirantis.net') {
                   #//  if (SOURCE_BRANCH == "master")
                   #//      version = "666~${timestamp}"
                   #export BUILDTAG=
-                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory rpm
+                  docker exec tf-developer-sandbox make DEBUGINFO=TRUE -C ./tf-dev-env --no-print-directory rpm
                   #TODO: parse errors and archive logs. possible with junit
               '''
             }
