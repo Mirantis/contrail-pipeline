@@ -38,8 +38,9 @@ try {
     gerritChangeNum = ""
 }
 
-//node('docker') {
-node('jsl07.mcp.mirantis.net') {
+
+// use docker slaves excluding jsl09.mcp.mirantis.net host for debug
+node('docker && !jsl09.mcp.mirantis.net') {
     try{
 
         def timestamp = new Date().format("yyyyMMddHHmmss", TimeZone.getTimeZone('UTC'))
