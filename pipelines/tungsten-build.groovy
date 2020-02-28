@@ -268,25 +268,27 @@ node('docker && !jsl09.mcp.mirantis.net') {
             }
 
             Boolean publishMetadata = env.PUBLISH_METADATA ? env.PUBLISH_METADATA.toBoolean() : true
-            try {
-                stage('Publish metadata') {
-                    def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
-                    def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
-                    def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
-                    def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
-                    def releaseMetadataDirDepth = 2
-                    Map releaseMetadataParams = [
-                      'metadataCredentialsId': releaseMetadataCredentialsId,
-                      'metadataGitRepoUrl': releaseMetadataRepoUrl,
-                      'metadataGitRepoBranch': releaseMetadataGerritBranch,
-                      'crTopic': 'update-tungsten-artifacts',
-                      'comment': 'Update Tungsten Fabric artifacts',
-                    ]
-                    releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+            if (gerritChangeNum == "") {
+                try {
+                    stage('Publish metadata') {
+                        def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
+                        def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
+                        def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
+                        def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
+                        def releaseMetadataDirDepth = 2
+                        Map releaseMetadataParams = [
+                                'metadataCredentialsId': releaseMetadataCredentialsId,
+                                'metadataGitRepoUrl': releaseMetadataRepoUrl,
+                                'metadataGitRepoBranch': releaseMetadataGerritBranch,
+                                'crTopic': 'update-tungsten-artifacts',
+                                'comment': 'Update Tungsten Fabric artifacts',
+                        ]
+                        releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+                    }
+                } catch (err) {
+                    def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
+                    common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
                 }
-            } catch (err) {
-                def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
-                common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
             }
 
             stage("Process results") {
