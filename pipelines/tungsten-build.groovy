@@ -13,7 +13,7 @@ def dockerLib = new com.mirantis.mk.Docker()
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
 def artifactoryUrl = server.getUrl()
-def pubRegistry = env.PUB_REGISTRY ?:'docker-dev-local.docker.mirantis.net/tungsten'
+def pubRegistry = env.PUB_REGISTRY ?:'docker-dev-kaas-local.docker.mirantis.net/tungsten'
 def floatingPubTag = "5.1-dev"
 def dockerDevRepo = "${pubRegistry.tokenize('.')[0]}"
 def dockerDevRegistry = "${pubRegistry.tokenize('/')[0]}"
@@ -22,8 +22,8 @@ imageNameSpace = pubRegistry.replaceFirst("${dockerDevRegistry}/", '')
 publishRetryAttempts = 10
 
 // Artifactory related paramters
-String artifactoryRepo            = env.ARTIFACTORY_REPO ?: 'binary-dev-local'
-String artifactoryNamespace       = env.ARTIFACTORY_NAMESPACE ?: "tungsten"
+String artifactoryRepo            = env.ARTIFACTORY_REPO ?: 'binary-dev-kaas-local'
+String artifactoryNamespace       = env.ARTIFACTORY_NAMESPACE ?: "tungsten/bin"
 def artifactoryBuildInfo          = Artifactory.newBuildInfo()
 server.credentialsId              = env.ARTIFACTORY_CREDENTIALS_ID ?: 'artifactory'
 
