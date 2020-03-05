@@ -39,6 +39,8 @@ try {
     gerritChangeNum = ""
 }
 
+def artifactsDir = '_artifacts/'
+
 // use docker slaves excluding jsl09.mcp.mirantis.net host for debug
 node('docker && !jsl09.mcp.mirantis.net') {
     try{
@@ -178,6 +180,8 @@ node('docker && !jsl09.mcp.mirantis.net') {
 
             def keysArr = []
             def valuesArr = []
+            def metadata = ['binary': ['tungsten': ['contrail-api-client': [:], ]],
+                            'images': ['tungsten': ['r51': [:], ]]]
 
             stage("contrail-api-client wheel") {
                   sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
@@ -200,8 +204,9 @@ node('docker && !jsl09.mcp.mirantis.net') {
                   // prepare keys to artifact-metadata
                   common.infoMsg("Prepare artifact metadate for contrail-api-client")
                   wheelList.each { wheelFile ->
-                      keysArr.add('binary:tungsten:R51:contrail-api-client')
+                      keysArr.add('binary:tungsten:contrail-api-client')
                       valuesArr.add(sprintf('url: %1$s', ["${artifactoryUrl}/${artifactoryUploadPath}/contrail-api-client/${wheelFile.name}"]))
+                      metadata.binary.tungsten['contrail-api-client'] = ['url': "${artifactoryUrl}/${artifactoryUploadPath}/contrail-api-client/${wheelFile.name}"]
                   }
             }
 
@@ -211,7 +216,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
             String containerBuilderDir = "src/${CANONICAL_HOSTNAME}/tungsten/contrail-container-builder"
 
 
-            def imageArtifactPath = 'metadata/images/tungsten/R51'
+            def imageArtifactPath = 'metadata/images/tungsten/r51'
             def imageArtifactTpl = '''tag: ${imageTag}
                     url: ${imageFullUrl}'''
 
@@ -257,14 +262,22 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                         sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
                                         if (pTag != floatingPubTag) {
                                             // prepare keys to artifact-metadata
-                                            keysArr.add('images:tungsten:R51:' + image)
+                                            keysArr.add('images:tungsten:r51:' + image)
                                             valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
+                                            metadata.images.tungsten.r51."${image}" = ['tag': pTag, 'url': publicImage]
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                }
+            }
+
+            stage('Save metadata') {
+                dir(artifactsDir){
+                    sh 'rm -f metadata.yaml'
+                    writeYaml file: 'metadata.yaml', data: metadata
                 }
             }
 
@@ -308,6 +321,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
        currentBuild.result = "FAILURE"
        throw e
     } finally {
+       archiveArtifacts allowEmptyArchive: true, artifacts: "${artifactsDir}/*", excludes: null
        //common.sendNotification(currentBuild.result,"",["slack"])
         if (cleanWorkspaceAfterBuild ) {
             sh "sudo rm -rf ${workspace}/*"
