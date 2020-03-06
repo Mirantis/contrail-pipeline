@@ -159,7 +159,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
                 // checkout to change request if needed
                 // TODO: implement versioning
               sh '''
-                  echo "INFO: make create-repo prepare-containers prepare-deployers   $(date)"
+                  echo "INFO: make create-repo prepare-containers prepare-deployers prepare-status-containers $(date)"
                   docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 4 create-repo prepare-containers prepare-deployers prepare-status-containers
               '''
               listContainers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-containers", returnStdout: true).trim().tokenize()
