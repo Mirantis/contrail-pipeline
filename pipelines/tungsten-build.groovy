@@ -30,6 +30,7 @@ server.credentialsId              = env.ARTIFACTORY_CREDENTIALS_ID ?: 'artifacto
 String artifactoryUploadPath      = "${artifactoryRepo}/${artifactoryNamespace}"
 String artifactoryUploadPattern   = env.ARTIFACTORY_UPLOAD_PATTERN ?: '*'
 
+boolean cleanWorkspaceAfterBuild   = (env.CLEAN_WORKSPACE_AFTER_BUILD ?: 'true').toBoolean()
 
 def gerritChangeNum
 try {
@@ -308,6 +309,11 @@ node('docker && !jsl09.mcp.mirantis.net') {
        throw e
     } finally {
        //common.sendNotification(currentBuild.result,"",["slack"])
-       //sh("rm -rf src buildresult-*")
+        if (cleanWorkspaceAfterBuild ) {
+            sh "sudo rm -rf ${workspace}/*"
+            deleteDir()
+        } else {
+            common.warningMsg("Skip environment deletion because CLEAN_WORKSPACE_AFTER_BUILD is false")
+        }
     }
 }
