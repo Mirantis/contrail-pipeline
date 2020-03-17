@@ -10,15 +10,47 @@ def common = new com.mirantis.mk.Common()
 def gerrit = new com.mirantis.mk.Gerrit()
 def dockerLib = new com.mirantis.mk.Docker()
 
+def isMerged = (!env.GERRIT_EVENT_TYPE || env.GERRIT_EVENT_TYPE in ['ref-updated', 'change-merged'])
+def gerritChangeNum
+try {
+    gerritChangeNum = GERRIT_CHANGE_NUMBER
+} catch (MissingPropertyException e) {
+    gerritChangeNum = ""
+}
+
+
+TUNGSTEN_PIPELINE_OPTIONS = env.TUNGSTEN_PIPELINE_OPTIONS ?: """
+review:
+    image:
+        registry: docker-dev-local.docker.mirantis.net
+        regpath: tungsten
+    binary:
+        registry: binary-dev-local
+        regpath: tungsten/bin
+    publishMetadata: false
+merged:
+    image:
+        registry: docker-dev-kaas-local.docker.mirantis.net
+        regpath: tungsten
+    binary:
+        registry: binary-dev-kaas-local
+        regpath: tungsten/bin
+    publishMetadata: true
+    floatingPubTag: 5.1-dev
+"""
+options = readYaml(text: TUNGSTEN_PIPELINE_OPTIONS)[(isMerged ? 'merged' : 'review')]
+
+def imageRegistry = env.IMAGE_REGISTRY ?: "${options.image.registry}/${options.image.regpath}"
+def dockerDevRepo = "${imageRegistry.tokenize('.')[0]}"
+
+def binaryRegistry = env.BINARY_REGISTRY ?: "${options.binary.registry}/${options.binary.regpath}"
+
+boolean publishMetadata = options.containsKey('publishMetadata') ? options.publishMetadata : env.PUBLISH_METADATA.toBoolean()
+
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
 def artifactoryUrl = server.getUrl()
-def pubRegistry = env.PUB_REGISTRY ?:'docker-dev-kaas-local.docker.mirantis.net/tungsten'
-def floatingPubTag = "5.1-dev"
-def dockerDevRepo = "${pubRegistry.tokenize('.')[0]}"
-def dockerDevRegistry = "${pubRegistry.tokenize('/')[0]}"
 
-imageNameSpace = pubRegistry.replaceFirst("${dockerDevRegistry}/", '')
 publishRetryAttempts = 10
 
 // Artifactory related paramters
@@ -31,14 +63,7 @@ String artifactoryUploadPath      = "${artifactoryRepo}/${artifactoryNamespace}"
 String artifactoryUploadPattern   = env.ARTIFACTORY_UPLOAD_PATTERN ?: '*'
 
 boolean cleanWorkspaceAfterBuild   = (env.CLEAN_WORKSPACE_AFTER_BUILD ?: 'true').toBoolean()
-boolean publishMetadata            = (env.PUBLISH_METADATA ?: 'false').toBoolean()
-
-def gerritChangeNum
-try {
-    gerritChangeNum = GERRIT_CHANGE_NUMBER
-} catch (MissingPropertyException e) {
-    gerritChangeNum = ""
-}
+String canonicalHostname = env.CANONICAL_HOSTNAME ?: 'gerrit.mcp.mirantis.net'
 
 def artifactsDir = '_artifacts/'
 
@@ -54,8 +79,8 @@ node('docker && !jsl09.mcp.mirantis.net') {
             "AUTOBUILD=${AUTOBUILD}",
             "EXTERNAL_REPOS=${WORKSPACE}/src",
             "SRC_ROOT=${WORKSPACE}/contrail",
-            "CANONICAL_HOSTNAME=${CANONICAL_HOSTNAME}",
-            "IMAGE=${IMAGE}",
+            "CANONICAL_HOSTNAME=${canonicalHostname}",
+            "IMAGE=${DEVENVIMAGE}",
             "DEVENVTAG=${DEVENVTAG}",
             "SRCVER=5.1.${timestamp}",
         ]) {
@@ -205,7 +230,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
 
             List brokenList
             List containerLogList
-            String containerBuilderDir = "src/${CANONICAL_HOSTNAME}/tungsten/contrail-container-builder"
+            String containerBuilderDir = "src/${canonicalHostname}/tungsten/contrail-container-builder"
 
 
             def imageArtifactPath = 'metadata/images/tungsten/r51'
@@ -218,15 +243,15 @@ node('docker && !jsl09.mcp.mirantis.net') {
                         it.replaceAll(/^container/, 'contrail').replaceAll(/^deployer/, 'contrail').replaceAll('_' , '-')
                     }
                     common.infoMsg("imageList = ${imageList}")
-                    docker.withRegistry("http://${dockerDevRegistry}/", 'artifactory') {
+                    docker.withRegistry("http://${options.image.registry}/", 'artifactory') {
                         List commonEnv = readFile("common.env").split('\n')
                         withEnv(commonEnv) {
                             dir ("../" + containerBuilderDir + "/containers/") {
                                 containerLogList = findFiles (glob: "build-*.log")
                             }
-                            currentBuild.description = "[<a href=\"https://${dockerDevRegistry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${imageNameSpace}\">tree</a>]"
+                            currentBuild.description = "[<a href=\"https://${options.image.registry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${options.image.regpath}\">tree</a>]"
                             def descJson = '{"packagePayload":[{"id":"dockerV2Tag","values":["' + "${SRCVER}" + '"]}],"selectedPackageType":{"id":"dockerV2","icon":"docker","displayName":"Docker"}}'
-                            currentBuild.description = "<a href=\"https://${dockerDevRegistry}/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
+                            currentBuild.description = "<a href=\"https://${options.image.registry}/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
                             brokenList = containerLogList.collect {
                                 it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
                             }
@@ -235,24 +260,24 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                 if (! (image in brokenList)) {
                                     def localImage = "${CONTRAIL_REGISTRY}/${image}:${CONTRAIL_VERSION}"
                                     def publishTags = ["${SRCVER}"]
-                                    // Add floating tag only in builds for merged code
-                                    if (gerritChangeNum == "") {
-                                        publishTags.add("${floatingPubTag}")
+                                    // Add floating tag only if it defined
+                                    if (options.containsKey('floatingPubTag')) {
+                                        publishTags.add("${options.floatingPubTag}")
                                     }
                                     publishTags.each { pTag ->
-                                        def publicImage = "${dockerDevRegistry}/${imageNameSpace}/${image}:${pTag}"
+                                        def publicImage = "${options.image.registry}/${options.image.regpath}/${image}:${pTag}"
                                         sh "docker tag ${localImage} ${publicImage}"
                                         retry(publishRetryAttempts) {
                                             artTools.uploadImageToArtifactory(
                                                 server,
-                                                dockerDevRegistry,
-                                                "${imageNameSpace}/${image}",
+                                                options.image.registry,
+                                                "${options.image.regpath}/${image}",
                                                 "${pTag}",
                                                 dockerDevRepo)
                                             sh "docker rmi ${publicImage}"
                                         }
                                         sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
-                                        if (pTag != floatingPubTag) {
+                                        if (options.containsKey('floatingPubTag') && (pTag != options.floatingPubTag)) {
                                             // prepare keys to artifact-metadata
                                             keysArr.add('images:tungsten:r51:' + image)
                                             valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
@@ -276,7 +301,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
             try {
                 stage('Publish metadata') {
                     if (publishMetadata) {
-                        if (gerritChangeNum == "" || env.GERRIT_EVENT_TYPE in ['ref-updated', 'change-merged']) {
+                        if (isMerged) {
                             def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
                             def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
                             def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
