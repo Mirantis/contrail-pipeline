@@ -180,8 +180,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
 
             def keysArr = []
             def valuesArr = []
-            def metadata = ['binary': ['tungsten': ['contrail-api-client': [:], ]],
-                            'images': ['tungsten': ['r51': [:], ]]]
+            def metadata = ['images': ['tungsten': ['r51': [:], ]]]
 
             stage("contrail-api-client wheel") {
                   sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
@@ -191,7 +190,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
                   sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/dist/ tf-developer-sandbox ls -l"
                   sh "ls -l contrail/src/contrail-api-client/build/debug/api-lib/dist"
                   wheelGlob = 'contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl'
-                  wheelList = findFiles (glob: wheelGlob)
                   String uploadSpec = """{
                     "files": [
                       {
@@ -201,13 +199,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
                     ]
                   }"""
                   artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
-                  // prepare keys to artifact-metadata
-                  common.infoMsg("Prepare artifact metadate for contrail-api-client")
-                  wheelList.each { wheelFile ->
-                      keysArr.add('binary:tungsten:contrail-api-client')
-                      valuesArr.add(sprintf('url: %1$s', ["${artifactoryUrl}/${artifactoryUploadPath}/contrail-api-client/${wheelFile.name}"]))
-                      metadata.binary.tungsten['contrail-api-client'] = ['url': "${artifactoryUrl}/${artifactoryUploadPath}/contrail-api-client/${wheelFile.name}"]
-                  }
             }
 
 
