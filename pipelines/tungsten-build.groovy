@@ -31,6 +31,7 @@ String artifactoryUploadPath      = "${artifactoryRepo}/${artifactoryNamespace}"
 String artifactoryUploadPattern   = env.ARTIFACTORY_UPLOAD_PATTERN ?: '*'
 
 boolean cleanWorkspaceAfterBuild   = (env.CLEAN_WORKSPACE_AFTER_BUILD ?: 'true').toBoolean()
+boolean publishMetadata            = (env.PUBLISH_METADATA ?: 'false').toBoolean()
 
 def gerritChangeNum
 try {
@@ -272,28 +273,33 @@ node('docker && !jsl09.mcp.mirantis.net') {
                 }
             }
 
-            Boolean publishMetadata = env.PUBLISH_METADATA ? env.PUBLISH_METADATA.toBoolean() : true
-            if (gerritChangeNum == "") {
-                try {
-                    stage('Publish metadata') {
-                        def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
-                        def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
-                        def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
-                        def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
-                        def releaseMetadataDirDepth = 2
-                        Map releaseMetadataParams = [
-                                'metadataCredentialsId': releaseMetadataCredentialsId,
-                                'metadataGitRepoUrl': releaseMetadataRepoUrl,
-                                'metadataGitRepoBranch': releaseMetadataGerritBranch,
-                                'crTopic': 'update-tungsten-artifacts',
-                                'comment': 'Update Tungsten Fabric artifacts',
-                        ]
-                        releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+            try {
+                stage('Publish metadata') {
+                    if (publishMetadata) {
+                        if (gerritChangeNum == "" || env.GERRIT_EVENT_TYPE in ['ref-updated', 'change-merged']) {
+                            def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
+                            def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
+                            def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
+                            def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
+                            def releaseMetadataDirDepth = 2
+                            Map releaseMetadataParams = [
+                                    'metadataCredentialsId': releaseMetadataCredentialsId,
+                                    'metadataGitRepoUrl': releaseMetadataRepoUrl,
+                                    'metadataGitRepoBranch': releaseMetadataGerritBranch,
+                                    'crTopic': 'update-tungsten-artifacts',
+                                    'comment': 'Update Tungsten Fabric artifacts',
+                            ]
+                            releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+                        } else {
+                            common.infoMsg("Skipping publishing metadata because GERRIT_EVENT_TYPE=${env.GERRIT_EVENT_TYPE}")
+                        }
+                    } else {
+                        common.infoMsg("Skipping publishing metadata because PUBLISH_METADATA=${publishMetadata}")
                     }
-                } catch (err) {
-                    def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
-                    common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
                 }
+            } catch (err) {
+                def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
+                common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
             }
 
             stage("Process results") {
