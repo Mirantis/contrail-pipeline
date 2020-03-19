@@ -5,7 +5,6 @@
  *
  * Expected parameters:
  */
-
 def common = new com.mirantis.mk.Common()
 def gerrit = new com.mirantis.mk.Gerrit()
 def dockerLib = new com.mirantis.mk.Docker()
@@ -46,6 +45,8 @@ def dockerDevRepo = "${imageRegistry.tokenize('.')[0]}"
 def binaryRegistry = env.BINARY_REGISTRY ?: "${options.binary.registry}/${options.binary.regpath}"
 
 boolean publishMetadata = options.containsKey('publishMetadata') ? options.publishMetadata : env.PUBLISH_METADATA.toBoolean()
+def floatingPubTag = options.containsKey('floatingPubTag') ? options.floatingPubTag : ""
+
 
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
@@ -261,8 +262,8 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                     def localImage = "${CONTRAIL_REGISTRY}/${image}:${CONTRAIL_VERSION}"
                                     def publishTags = ["${SRCVER}"]
                                     // Add floating tag only if it defined
-                                    if (options.containsKey('floatingPubTag')) {
-                                        publishTags.add("${options.floatingPubTag}")
+                                    if (floatingPubTag) {
+                                        publishTags.add(floatingPubTag)
                                     }
                                     publishTags.each { pTag ->
                                         def publicImage = "${options.image.registry}/${options.image.regpath}/${image}:${pTag}"
@@ -277,7 +278,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                             sh "docker rmi ${publicImage}"
                                         }
                                         sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
-                                        if (options.containsKey('floatingPubTag') && (pTag != options.floatingPubTag)) {
+                                        if (pTag != floatingPubTag) {
                                             // prepare keys to artifact-metadata
                                             keysArr.add('images:tungsten:r51:' + image)
                                             valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
