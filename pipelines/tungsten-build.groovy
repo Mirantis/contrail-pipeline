@@ -5,20 +5,12 @@
  *
  * Expected parameters:
  */
+
+// Initialize common libraries
 def common = new com.mirantis.mk.Common()
-def gerrit = new com.mirantis.mk.Gerrit()
-def dockerLib = new com.mirantis.mk.Docker()
 
 def isMerged = (!env.GERRIT_EVENT_TYPE || env.GERRIT_EVENT_TYPE in ['ref-updated', 'change-merged'])
-def gerritChangeNum
-try {
-    gerritChangeNum = GERRIT_CHANGE_NUMBER
-} catch (MissingPropertyException e) {
-    gerritChangeNum = ""
-}
-
-
-TUNGSTEN_PIPELINE_OPTIONS = env.TUNGSTEN_PIPELINE_OPTIONS ?: """
+def pipelinePublishOptions = env.PIPELINE_OPTIONS ?: """
 review:
     image:
         registry: docker-dev-local.docker.mirantis.net
@@ -37,12 +29,10 @@ merged:
     publishMetadata: true
     floatingPubTag: 5.1-dev
 """
-options = readYaml(text: TUNGSTEN_PIPELINE_OPTIONS)[(isMerged ? 'merged' : 'review')]
+options = readYaml(text: pipelinePublishOptions)[(isMerged ? 'merged' : 'review')]
 
 def imageRegistry = env.IMAGE_REGISTRY ?: "${options.image.registry}/${options.image.regpath}"
 def dockerDevRepo = "${imageRegistry.tokenize('.')[0]}"
-
-def binaryRegistry = env.BINARY_REGISTRY ?: "${options.binary.registry}/${options.binary.regpath}"
 
 boolean publishMetadata = options.containsKey('publishMetadata') ? options.publishMetadata : env.PUBLISH_METADATA.toBoolean()
 def floatingPubTag = options.containsKey('floatingPubTag') ? options.floatingPubTag : ""
@@ -50,18 +40,15 @@ def floatingPubTag = options.containsKey('floatingPubTag') ? options.floatingPub
 
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
-def artifactoryUrl = server.getUrl()
 
 publishRetryAttempts = 10
 
-// Artifactory related paramters
+// Artifactory related parameters
 String artifactoryRepo            = env.ARTIFACTORY_REPO ?: 'binary-dev-kaas-local'
 String artifactoryNamespace       = env.ARTIFACTORY_NAMESPACE ?: "tungsten/bin"
 def artifactoryBuildInfo          = Artifactory.newBuildInfo()
 server.credentialsId              = env.ARTIFACTORY_CREDENTIALS_ID ?: 'artifactory'
-
 String artifactoryUploadPath      = "${artifactoryRepo}/${artifactoryNamespace}"
-String artifactoryUploadPattern   = env.ARTIFACTORY_UPLOAD_PATTERN ?: '*'
 
 boolean cleanWorkspaceAfterBuild   = (env.CLEAN_WORKSPACE_AFTER_BUILD ?: 'true').toBoolean()
 String canonicalHostname = env.CANONICAL_HOSTNAME ?: 'gerrit.mcp.mirantis.net'
@@ -234,10 +221,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
             String containerBuilderDir = "src/${canonicalHostname}/tungsten/contrail-container-builder"
 
 
-            def imageArtifactPath = 'metadata/images/tungsten/r51'
-            def imageArtifactTpl = '''tag: ${imageTag}
-                    url: ${imageFullUrl}'''
-
             stage("Upload images") {
                 dir("tf-dev-env") {
                     List imageList = (listContainers + listDeployers).collect {
@@ -345,7 +328,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
        throw e
     } finally {
        archiveArtifacts allowEmptyArchive: true, artifacts: "${artifactsDir}/*", excludes: null
-       //common.sendNotification(currentBuild.result,"",["slack"])
         if (cleanWorkspaceAfterBuild ) {
             sh "sudo rm -rf ${workspace}/*"
             deleteDir()
