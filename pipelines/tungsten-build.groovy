@@ -275,6 +275,15 @@ node('docker && !jsl09.mcp.mirantis.net') {
                 }
             }
 
+            stage("Process results") {
+                archiveArtifacts artifacts: 'image-list.txt'
+                if(!brokenList.isEmpty()) {
+                    common.errorMsg("Failed to build some containers:\n${brokenList}\nSee log files at artifacts")
+                    archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
+                    currentBuild.result = "FAILURE"
+                }
+            }
+
             stage('Save metadata') {
                 dir(artifactsDir){
                     sh 'rm -f metadata.yaml'
@@ -309,15 +318,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
             } catch (err) {
                 def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
                 common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
-            }
-
-            stage("Process results") {
-                archiveArtifacts artifacts: 'image-list.txt'
-                if(!brokenList.isEmpty()) {
-                    common.errorMsg("Failed to build some containers:\n${brokenList}\nSee log files at artifacts")
-                    archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
-                    currentBuild.result = "FAILURE"
-                }
             }
 
         }
