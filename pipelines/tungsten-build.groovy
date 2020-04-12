@@ -1,13 +1,9 @@
 #!groovy
 /**
  *
- * contrail build, test, promote pipeline
+ * contrail build and promote pipeline
  *
- * Expected parameters:
  */
-
-import static groovy.json.JsonOutput.toJson
-
 
 // Initialize common libraries
 def common = new com.mirantis.mk.Common()
@@ -285,66 +281,6 @@ node('docker && !jsl09.mcp.mirantis.net') {
                     archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
                     currentBuild.result = "FAILURE"
                 }
-            }
-
-            if (env.GERRIT_EVENT_TYPE in ['patchset-created', 'comment-added']) {
-                stage('Test TungstenFabric') {
-
-                    // deploy/test variables
-                    def testJobName = "test-tungsten-os-train"
-                    def gerritCredsForTestJob = "mcp-ci-gerrit"
-                    def clusterContextName = "mstr1-wrkr3-cmp2-ntw3"
-                    def osEnv = "imc-us"
-                    def osContextName = "train/core-ceph-local-tf"
-                    def osOnK8sRelease = "nightly"
-                    def extraDeploymentContext = ['tf-helm': [:], 'tf-operator': [:]]
-                    // TODO: add tests once PRODX-751 is done, use empty set of tests at the moment
-                    // Example: def testSchemas = [["smoke": true, "concurrency": 4, "testrail": false]]
-                    def testSchemas = []
-
-                    wrap([$class: 'BuildUser']) {
-                        if (env.BUILD_USER_ID) {
-                            osProjectName = 'networking-team'
-                        } else {
-                            osProjectName = 'networking-ci-team'
-                        }
-                    }
-
-                    // prepare extra context for deployment
-                    extraDeploymentContext["tf-operator"] = [
-                            "spec": [
-                                    "settings": [
-                                            "tfImage": [
-                                                    "tfImageRegistry": "${options.image.registry}",
-                                                    "tfImagePath": "${options.image.regpath}",
-                                                    "tfImageTag": "${SRCVER}"
-                                            ]
-                                    ]
-                            ]
-
-                    ]
-
-                    testJobBuild = build(job: testJobName, parameters: [
-                            string(name: 'OPENSTACK_ON_K8S_RELEASE', value: osOnK8sRelease),
-                            string(name: 'GERRIT_CREDENTIALS_ID', value: gerritCredsForTestJob),
-                            string(name: 'NAMESPACE', value: osProjectName),
-                            string(name: 'CLUSTER_CONTEXT_NAME', value: clusterContextName),
-                            string(name: 'OPENSTACK_CONTEXT_NAME', value: osContextName),
-                            text(name: 'EXTRA_CONTEXT', value: toJson(extraDeploymentContext)),
-                            string(name: 'OPENSTACK_ENVIRONMENT', value: osEnv),
-                            text(name: 'TEST_SCHEMAS', value: toJson(testSchemas)),
-                    ],
-                            wait: true,
-                    )
-                    copyArtifacts(
-                            projectName: testJobName,
-                            selector: [$class: 'SpecificBuildSelector', buildNumber: testJobBuild.id],
-                            filter: '**/**.yml,**/**.yaml',
-                            optional: true,
-                    )
-                }
-            } else {
-                common.infoMsg("Skipping Tungsten Fabric test. Tests are running on gerrit CRs only")
             }
 
             stage('Save metadata') {
