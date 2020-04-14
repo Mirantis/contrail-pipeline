@@ -195,26 +195,24 @@ throttle(throttleCategories) {
                   '''
                 }
 
-                List listContainers
-                List listDeployers
+            List listContainers
 
                 stage("containers") {
-                    // TODO: update tf-dev-env/scripts/prepare-containers and prepare-deployers for
+                    // TODO: update tf-dev-env/scripts/prepare-containers for
                     // checkout to change request if needed
                     // TODO: implement versioning
                   sh '''
-                      echo "INFO: make create-repo prepare-containers prepare-deployers prepare-status-containers $(date)"
-                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 4 create-repo prepare-containers prepare-deployers prepare-status-containers
+                      echo "INFO: make create-repo prepare-containers prepare-status-containers $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 3 create-repo prepare-containers prepare-status-containers
                   '''
                   listContainers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-containers", returnStdout: true).trim().tokenize()
-                  listDeployers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-deployers", returnStdout: true).trim().tokenize()
 
                   sh '''
                       echo "INFO: make container-general-base $(date)"
                       docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory container-general-base
 
-                      echo "INFO: make containers-only deployers-only   $(date)"
-                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 2 containers-only deployers-only || EXIT_CODE=$?
+                      echo "INFO: make containers-only $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory containers-only || EXIT_CODE=$?
                       #TODO: parse errors and archive logs. possible with junit
                   '''
                 }
@@ -248,8 +246,8 @@ throttle(throttleCategories) {
 
                 stage("Upload images") {
                     dir("tf-dev-env") {
-                        List imageList = (listContainers + listDeployers).collect {
-                            it.replaceAll(/^container/, 'contrail').replaceAll(/^deployer/, 'contrail').replaceAll('_' , '-')
+                        List imageList = listContainers.collect {
+                            it.replaceAll(/^container/, 'contrail').replaceAll('_' , '-')
                         }
                         common.infoMsg("imageList = ${imageList}")
                         docker.withRegistry("http://${options.image.registry}/", 'artifactory') {
