@@ -36,6 +36,31 @@ def dockerDevRepo = "${imageRegistry.tokenize('.')[0]}"
 boolean publishMetadata = options.containsKey('publishMetadata') ? options.publishMetadata : env.PUBLISH_METADATA.toBoolean()
 def floatingPubTag = options.containsKey('floatingPubTag') ? options.floatingPubTag : ""
 
+// Do not add these images to metadata. But they will builded and published.
+def metadataSkipList = [
+    "contrail-external-cassandra",
+    "contrail-external-dnsmasq",
+    "contrail-external-haproxy",
+    "contrail-external-kafka",
+    "contrail-external-rabbitmq",
+    "contrail-external-redis",
+    "contrail-external-zookeeper",
+    "contrail-kubernetes-cni-init",
+    "contrail-kubernetes-kube-manager",
+    "contrail-mesosphere-cni-init",
+    "contrail-mesosphere-mesos-manager",
+    "contrail-openstack-compute-init",
+    "contrail-openstack-heat-init",
+    "contrail-openstack-ironic-notification-manager",
+    "contrail-openstack-neutron-init",
+    "contrail-vcenter-manager",
+    "contrail-vcenter-plugin",
+    "contrail-vrouter-plugin-mellanox-init-ubuntu",
+    "contrail-deployers-base",
+    "contrail-helm-deployer",
+    "contrail-kolla-ansible-deployer",
+    "contrail-openshift-ansible-deployer",
+]
 
 def server = Artifactory.server('mcp-ci')
 def artTools = new com.mirantis.mcp.MCPArtifactory()
@@ -214,11 +239,9 @@ node('docker && !jsl09.mcp.mirantis.net') {
                   artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
             }
 
-
             List brokenList
             List containerLogList
             String containerBuilderDir = "src/${canonicalHostname}/tungsten/contrail-container-builder"
-
 
             stage("Upload images") {
                 dir("tf-dev-env") {
@@ -260,7 +283,7 @@ node('docker && !jsl09.mcp.mirantis.net') {
                                             sh "docker rmi ${publicImage}"
                                         }
                                         sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
-                                        if (pTag != floatingPubTag) {
+                                        if ((pTag != floatingPubTag) && !(image in metadataSkipList)) {
                                             // prepare keys to artifact-metadata
                                             keysArr.add('images:tungsten:r51:' + image)
                                             valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
