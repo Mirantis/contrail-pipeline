@@ -79,215 +79,219 @@ String canonicalHostname = env.CANONICAL_HOSTNAME ?: 'gerrit.mcp.mirantis.net'
 
 def artifactsDir = '_artifacts/'
 
-// use docker slaves excluding jsl09.mcp.mirantis.net host for debug
-node('docker && !jsl09.mcp.mirantis.net') {
-    try{
+//TODO(aignatov): Categories above has to be taken from job parameters
+ArrayList throttleCategories = ['tungsten-build']
+throttle(throttleCategories) {
+    // use docker slaves excluding jsl09.mcp.mirantis.net host for debug
+    node('docker && !jsl09.mcp.mirantis.net') {
+        try{
 
-        def timestamp = new Date().format("yyyyMMddHHmmss", TimeZone.getTimeZone('UTC'))
-        println ("timestamp ${timestamp}")
+            def timestamp = new Date().format("yyyyMMddHHmmss", TimeZone.getTimeZone('UTC'))
+            println ("timestamp ${timestamp}")
 
-        withEnv([
-            "timestamp=${timestamp}",
-            "AUTOBUILD=${AUTOBUILD}",
-            "EXTERNAL_REPOS=${WORKSPACE}/src",
-            "SRC_ROOT=${WORKSPACE}/contrail",
-            "CANONICAL_HOSTNAME=${canonicalHostname}",
-            "IMAGE=${DEVENVIMAGE}",
-            "DEVENVTAG=${DEVENVTAG}",
-            "SRCVER=5.1.${timestamp}",
-        ]) {
+            withEnv([
+                "timestamp=${timestamp}",
+                "AUTOBUILD=${AUTOBUILD}",
+                "EXTERNAL_REPOS=${WORKSPACE}/src",
+                "SRC_ROOT=${WORKSPACE}/contrail",
+                "CANONICAL_HOSTNAME=${canonicalHostname}",
+                "IMAGE=${DEVENVIMAGE}",
+                "DEVENVTAG=${DEVENVTAG}",
+                "SRCVER=5.1.${timestamp}",
+            ]) {
 
-            stage("prepare") {
-              sh '''
-                  sudo rm -rf *
-                  git clone https://gerrit.mcp.mirantis.com/tungsten/tf-dev-env -b mcp/R5.1
-                  cd tf-dev-env
-                  if [ "${GERRIT_PROJECT##*/}" = "tf-dev-env" ]; then
-                      git fetch $(git remote -v | awk '/^origin.*fetch/ {print $2}') ${GERRIT_REFSPEC:?GERRIT_REFSPEC is empty} > /dev/null \
-                        && git checkout FETCH_HEAD > /dev/null
-                  fi
-                  echo "Using tf-dev-env version"
-                  git log --decorate -n1
-                  ./build.sh
-                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory clean
-                  docker exec tf-developer-sandbox pip install future
-              '''
-            }
+                stage("prepare") {
+                  sh '''
+                      sudo rm -rf *
+                      git clone https://gerrit.mcp.mirantis.com/tungsten/tf-dev-env -b mcp/R5.1
+                      cd tf-dev-env
+                      if [ "${GERRIT_PROJECT##*/}" = "tf-dev-env" ]; then
+                          git fetch $(git remote -v | awk '/^origin.*fetch/ {print $2}') ${GERRIT_REFSPEC:?GERRIT_REFSPEC is empty} > /dev/null \
+                            && git checkout FETCH_HEAD > /dev/null
+                      fi
+                      echo "Using tf-dev-env version"
+                      git log --decorate -n1
+                      ./build.sh
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory clean
+                      docker exec tf-developer-sandbox pip install future
+                  '''
+                }
 
-            writeFile file: "tf-dev-env/buildpipeline.env",
-                text: "GERRIT_PROJECT=${env.GERRIT_PROJECT}\n" \
-                    + "GERRIT_REFSPEC=${env.GERRIT_REFSPEC}\n"
-            stage("sync") {
-              sh '''
-                if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
-                    VNC_REVISION=${GERRIT_REFSPEC}
-                fi
-                docker exec tf-developer-sandbox repo init --no-clone-bundle -q -u https://gerrit.mcp.mirantis.com/tungsten/contrail-vnc -b ${VNC_REVISION:-${VNC_BRANCH}}
-                docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory sync
-              '''
-            }
+                writeFile file: "tf-dev-env/buildpipeline.env",
+                    text: "GERRIT_PROJECT=${env.GERRIT_PROJECT}\n" \
+                        + "GERRIT_REFSPEC=${env.GERRIT_REFSPEC}\n"
+                stage("sync") {
+                  sh '''
+                    if [ "${GERRIT_PROJECT##*/}" = "contrail-vnc" ]; then
+                        VNC_REVISION=${GERRIT_REFSPEC}
+                    fi
+                    docker exec tf-developer-sandbox repo init --no-clone-bundle -q -u https://gerrit.mcp.mirantis.com/tungsten/contrail-vnc -b ${VNC_REVISION:-${VNC_BRANCH}}
+                    docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory sync
+                  '''
+                }
 
-            stage("checkout") {
-              sh '''
-                  if [ -n "${GERRIT_PROJECT}" ]; then
-                      if [ "${GERRIT_PROJECT##*/}" != "tf-dev-env" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-vnc" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-container-builder" ]; then
-                          docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${GERRIT_PROJECT##*/} ${GERRIT_CHANGE_NUMBER}/${GERRIT_PATCHSET_NUMBER}
-                          if echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:'; then
-                              DEP_URL_LIST=$(echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:' | sed -r 's|/+$||g' | egrep -o '[^ ]+$')
-                              for DEP_URL in ${DEP_URL_LIST}; do
-                                  DEP_PROJECT_URL="${DEP_URL%/+/*}"
-                                  DEP_PROJECT="${DEP_PROJECT_URL##*/}"
-                                  DEP_CHANGE_ID="${DEP_URL##*/}"
-                                  docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${DEP_PROJECT} ${DEP_CHANGE_ID}
-                              done
+                stage("checkout") {
+                  sh '''
+                      if [ -n "${GERRIT_PROJECT}" ]; then
+                          if [ "${GERRIT_PROJECT##*/}" != "tf-dev-env" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-vnc" ] && [ "${GERRIT_PROJECT##*/}" != "contrail-container-builder" ]; then
+                              docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${GERRIT_PROJECT##*/} ${GERRIT_CHANGE_NUMBER}/${GERRIT_PATCHSET_NUMBER}
+                              if echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:'; then
+                                  DEP_URL_LIST=$(echo ${GERRIT_CHANGE_COMMIT_MESSAGE} | base64 -d | egrep -i '^depends-on:' | sed -r 's|/+$||g' | egrep -o '[^ ]+$')
+                                  for DEP_URL in ${DEP_URL_LIST}; do
+                                      DEP_PROJECT_URL="${DEP_URL%/+/*}"
+                                      DEP_PROJECT="${DEP_PROJECT_URL##*/}"
+                                      DEP_CHANGE_ID="${DEP_URL##*/}"
+                                      docker exec tf-developer-sandbox ./tf-dev-env/checkout.sh ${DEP_PROJECT} ${DEP_CHANGE_ID}
+                                  done
+                              else
+                                  echo "There are no depends-on"
+                              fi
                           else
-                              echo "There are no depends-on"
+                              echo "Skipping checkout because GERRIT_PROJECT is ${GERRIT_PROJECT}."
                           fi
                       else
-                          echo "Skipping checkout because GERRIT_PROJECT is ${GERRIT_PROJECT}."
+                          echo "Skipping checkout because GERRIT_PROJECT does not specified"
                       fi
-                  else
-                      echo "Skipping checkout because GERRIT_PROJECT does not specified"
-                  fi
-              '''
-            }
+                  '''
+                }
 
-            stage("fetch packages") {
-              // TODO: downstream third parties
-              sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory fetch_packages'
-            }
+                stage("fetch packages") {
+                  // TODO: downstream third parties
+                  sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory fetch_packages'
+                }
 
-            stage("setup") {
-              sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory setup'
-            }
+                stage("setup") {
+                  sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory setup'
+                }
 
-            stage("dep") {
-              sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory dep'
-            }
+                stage("dep") {
+                  sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory dep'
+                }
 
-            stage("info") {
-              sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory info'
-            }
+                stage("info") {
+                  sh 'docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory info'
+                }
 
-            stage("rpm") {
-              sh '''
-                  #TODO: implement versioning
-                  # Following Environment variables can be used for controlling Makefile behavior:
-                  # DEBUGINFO = TRUE/FALSE - build debuginfo packages (default: TRUE)
-                  # TOPDIR - control where packages will be built (default: SB_TOP)
-                  # SCONSOPT = debug/production - select optimization level for scons (default: production)
-                  # SRCVER - specify source code version (default from controller/src/base/version.info)
-                  # KVERS - kernel version to build against (default: installed version of kernel-devel)
-                  # BUILDTAG - additional tag for versioning (default: date +%m%d%Y%H%M)
-                  # SKUTAG - OpenStack SKU (default: ocata)
+                stage("rpm") {
+                  sh '''
+                      #TODO: implement versioning
+                      # Following Environment variables can be used for controlling Makefile behavior:
+                      # DEBUGINFO = TRUE/FALSE - build debuginfo packages (default: TRUE)
+                      # TOPDIR - control where packages will be built (default: SB_TOP)
+                      # SCONSOPT = debug/production - select optimization level for scons (default: production)
+                      # SRCVER - specify source code version (default from controller/src/base/version.info)
+                      # KVERS - kernel version to build against (default: installed version of kernel-devel)
+                      # BUILDTAG - additional tag for versioning (default: date +%m%d%Y%H%M)
+                      # SKUTAG - OpenStack SKU (default: ocata)
 
-                  #export VERSION="5.1.${timestamp}"
-                  #//  def version = SOURCE_BRANCH.replace('R', '') + "~${timestamp}"
-                  #//  def python_version = 'python'
-                  #//  if (SOURCE_BRANCH == "master")
-                  #//      version = "666~${timestamp}"
-                  #export BUILDTAG=
-                  docker exec tf-developer-sandbox make DEBUGINFO=TRUE -C ./tf-dev-env --no-print-directory rpm
-                  #TODO: parse errors and archive logs. possible with junit
-              '''
-            }
+                      #export VERSION="5.1.${timestamp}"
+                      #//  def version = SOURCE_BRANCH.replace('R', '') + "~${timestamp}"
+                      #//  def python_version = 'python'
+                      #//  if (SOURCE_BRANCH == "master")
+                      #//      version = "666~${timestamp}"
+                      #export BUILDTAG=
+                      docker exec tf-developer-sandbox make DEBUGINFO=TRUE -C ./tf-dev-env --no-print-directory rpm
+                      #TODO: parse errors and archive logs. possible with junit
+                  '''
+                }
 
-            List listContainers
-            List listDeployers
+                List listContainers
+                List listDeployers
 
-            stage("containers") {
-                // TODO: update tf-dev-env/scripts/prepare-containers and prepare-deployers for
-                // checkout to change request if needed
-                // TODO: implement versioning
-              sh '''
-                  echo "INFO: make create-repo prepare-containers prepare-deployers prepare-status-containers $(date)"
-                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 4 create-repo prepare-containers prepare-deployers prepare-status-containers
-              '''
-              listContainers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-containers", returnStdout: true).trim().tokenize()
-              listDeployers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-deployers", returnStdout: true).trim().tokenize()
+                stage("containers") {
+                    // TODO: update tf-dev-env/scripts/prepare-containers and prepare-deployers for
+                    // checkout to change request if needed
+                    // TODO: implement versioning
+                  sh '''
+                      echo "INFO: make create-repo prepare-containers prepare-deployers prepare-status-containers $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 4 create-repo prepare-containers prepare-deployers prepare-status-containers
+                  '''
+                  listContainers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-containers", returnStdout: true).trim().tokenize()
+                  listDeployers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-deployers", returnStdout: true).trim().tokenize()
 
-              sh '''
-                  echo "INFO: make container-general-base $(date)"
-                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory container-general-base
+                  sh '''
+                      echo "INFO: make container-general-base $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory container-general-base
 
-                  echo "INFO: make containers-only deployers-only   $(date)"
-                  docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 2 containers-only deployers-only || EXIT_CODE=$?
-                  #TODO: parse errors and archive logs. possible with junit
-              '''
-            }
+                      echo "INFO: make containers-only deployers-only   $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 2 containers-only deployers-only || EXIT_CODE=$?
+                      #TODO: parse errors and archive logs. possible with junit
+                  '''
+                }
 
-            def keysArr = []
-            def valuesArr = []
-            def metadata = ['images': ['tungsten': ['r51': [:], ]]]
+                def keysArr = []
+                def valuesArr = []
+                def metadata = ['images': ['tungsten': ['r51': [:], ]]]
 
-            stage("contrail-api-client wheel") {
-                  sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
-                  sh "docker exec -w /root/contrail/src/contrail-api-client/base/ tf-developer-sandbox sed -i -r 's/(.*)/\\1.${timestamp}/' version.info"
-                  sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox scons"
-                  sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/ tf-developer-sandbox python setup.py bdist_wheel --universal"
-                  sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/dist/ tf-developer-sandbox ls -l"
-                  sh "ls -l contrail/src/contrail-api-client/build/debug/api-lib/dist"
-                  wheelGlob = 'contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl'
-                  String uploadSpec = """{
-                    "files": [
-                      {
-                        "pattern": "${wheelGlob}",
-                        "target": "${artifactoryUploadPath}/contrail-api-client/"
-                      }
-                    ]
-                  }"""
-                  artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
-            }
+                stage("contrail-api-client wheel") {
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/base/ tf-developer-sandbox sed -i -r 's/(.*)/\\1.${timestamp}/' version.info"
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox scons"
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/ tf-developer-sandbox python setup.py bdist_wheel --universal"
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/dist/ tf-developer-sandbox ls -l"
+                      sh "ls -l contrail/src/contrail-api-client/build/debug/api-lib/dist"
+                      wheelGlob = 'contrail/src/contrail-api-client/build/debug/api-lib/dist/*.whl'
+                      String uploadSpec = """{
+                        "files": [
+                          {
+                            "pattern": "${wheelGlob}",
+                            "target": "${artifactoryUploadPath}/contrail-api-client/"
+                          }
+                        ]
+                      }"""
+                      artTools.uploadBinariesToArtifactory(server, artifactoryBuildInfo, uploadSpec, true)
+                }
 
-            List brokenList
-            List containerLogList
-            String containerBuilderDir = "src/${canonicalHostname}/tungsten/contrail-container-builder"
+                List brokenList
+                List containerLogList
+                String containerBuilderDir = "src/${canonicalHostname}/tungsten/contrail-container-builder"
 
-            stage("Upload images") {
-                dir("tf-dev-env") {
-                    List imageList = (listContainers + listDeployers).collect {
-                        it.replaceAll(/^container/, 'contrail').replaceAll(/^deployer/, 'contrail').replaceAll('_' , '-')
-                    }
-                    common.infoMsg("imageList = ${imageList}")
-                    docker.withRegistry("http://${options.image.registry}/", 'artifactory') {
-                        List commonEnv = readFile("common.env").split('\n')
-                        withEnv(commonEnv) {
-                            dir ("../" + containerBuilderDir + "/containers/") {
-                                containerLogList = findFiles (glob: "build-*.log")
-                            }
-                            currentBuild.description = "[<a href=\"https://${options.image.registry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${options.image.regpath}\">tree</a>]"
-                            def descJson = '{"packagePayload":[{"id":"dockerV2Tag","values":["' + "${SRCVER}" + '"]}],"selectedPackageType":{"id":"dockerV2","icon":"docker","displayName":"Docker"}}'
-                            currentBuild.description = "<a href=\"https://${options.image.registry}/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
-                            brokenList = containerLogList.collect {
-                                it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
-                            }
-                            common.infoMsg("brokenList = ${brokenList}")
-                            imageList.each { image ->
-                                if (! (image in brokenList)) {
-                                    def localImage = "${CONTRAIL_REGISTRY}/${image}:${CONTRAIL_VERSION}"
-                                    def publishTags = ["${SRCVER}"]
-                                    // Add floating tag only if it defined
-                                    if (floatingPubTag) {
-                                        publishTags.add(floatingPubTag)
-                                    }
-                                    publishTags.each { pTag ->
-                                        def publicImage = "${options.image.registry}/${options.image.regpath}/${image}:${pTag}"
-                                        sh "docker tag ${localImage} ${publicImage}"
-                                        retry(publishRetryAttempts) {
-                                            artTools.uploadImageToArtifactory(
-                                                server,
-                                                options.image.registry,
-                                                "${options.image.regpath}/${image}",
-                                                "${pTag}",
-                                                dockerDevRepo)
-                                            sh "docker rmi ${publicImage}"
+                stage("Upload images") {
+                    dir("tf-dev-env") {
+                        List imageList = (listContainers + listDeployers).collect {
+                            it.replaceAll(/^container/, 'contrail').replaceAll(/^deployer/, 'contrail').replaceAll('_' , '-')
+                        }
+                        common.infoMsg("imageList = ${imageList}")
+                        docker.withRegistry("http://${options.image.registry}/", 'artifactory') {
+                            List commonEnv = readFile("common.env").split('\n')
+                            withEnv(commonEnv) {
+                                dir ("../" + containerBuilderDir + "/containers/") {
+                                    containerLogList = findFiles (glob: "build-*.log")
+                                }
+                                currentBuild.description = "[<a href=\"https://${options.image.registry}/artifactory/webapp/#/artifacts/browse/tree/General/${dockerDevRepo}/${options.image.regpath}\">tree</a>]"
+                                def descJson = '{"packagePayload":[{"id":"dockerV2Tag","values":["' + "${SRCVER}" + '"]}],"selectedPackageType":{"id":"dockerV2","icon":"docker","displayName":"Docker"}}'
+                                currentBuild.description = "<a href=\"https://${options.image.registry}/artifactory/webapp/#/search/package/${descJson.bytes.encodeBase64().toString()}\">${SRCVER}</a> ${currentBuild.description}"
+                                brokenList = containerLogList.collect {
+                                    it.getName().replaceFirst(/^build-/, '').replaceAll(/.log$/ , '')
+                                }
+                                common.infoMsg("brokenList = ${brokenList}")
+                                imageList.each { image ->
+                                    if (! (image in brokenList)) {
+                                        def localImage = "${CONTRAIL_REGISTRY}/${image}:${CONTRAIL_VERSION}"
+                                        def publishTags = ["${SRCVER}"]
+                                        // Add floating tag only if it defined
+                                        if (floatingPubTag) {
+                                            publishTags.add(floatingPubTag)
                                         }
-                                        sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
-                                        if ((pTag != floatingPubTag) && !(image in metadataSkipList)) {
-                                            // prepare keys to artifact-metadata
-                                            keysArr.add('images:tungsten:r51:' + image)
-                                            valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
-                                            metadata.images.tungsten.r51."${image}" = ['tag': pTag, 'url': publicImage]
+                                        publishTags.each { pTag ->
+                                            def publicImage = "${options.image.registry}/${options.image.regpath}/${image}:${pTag}"
+                                            sh "docker tag ${localImage} ${publicImage}"
+                                            retry(publishRetryAttempts) {
+                                                artTools.uploadImageToArtifactory(
+                                                    server,
+                                                    options.image.registry,
+                                                    "${options.image.regpath}/${image}",
+                                                    "${pTag}",
+                                                    dockerDevRepo)
+                                                sh "docker rmi ${publicImage}"
+                                            }
+                                            sh "echo '${publicImage}' >> ${WORKSPACE}/image-list.txt"
+                                            if ((pTag != floatingPubTag) && !(image in metadataSkipList)) {
+                                                // prepare keys to artifact-metadata
+                                                keysArr.add('images:tungsten:r51:' + image)
+                                                valuesArr.add(sprintf('tag: %1$s\nurl: %2$s', [pTag, publicImage]))
+                                                metadata.images.tungsten.r51."${image}" = ['tag': pTag, 'url': publicImage]
+                                            }
                                         }
                                     }
                                 }
@@ -295,66 +299,66 @@ node('docker && !jsl09.mcp.mirantis.net') {
                         }
                     }
                 }
-            }
 
-            stage("Process results") {
-                archiveArtifacts artifacts: 'image-list.txt'
-                if(!brokenList.isEmpty()) {
-                    common.errorMsg("Failed to build some containers:\n${brokenList}\nSee log files at artifacts")
-                    archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
-                    currentBuild.result = "FAILURE"
-                }
-            }
-
-            stage('Save metadata') {
-                dir(artifactsDir){
-                    sh 'rm -f metadata.yaml'
-                    writeYaml file: 'metadata.yaml', data: metadata
-                }
-            }
-
-            try {
-                stage('Publish metadata') {
-                    if (publishMetadata) {
-                        if (isMerged) {
-                            def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
-                            def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
-                            def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
-                            def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
-                            def releaseMetadataDirDepth = 2
-                            Map releaseMetadataParams = [
-                                    'metadataCredentialsId': releaseMetadataCredentialsId,
-                                    'metadataGitRepoUrl': releaseMetadataRepoUrl,
-                                    'metadataGitRepoBranch': releaseMetadataGerritBranch,
-                                    'crTopic': 'update-tungsten-artifacts',
-                                    'comment': 'Update Tungsten Fabric artifacts',
-                            ]
-                            releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
-                        } else {
-                            common.infoMsg("Skipping publishing metadata because GERRIT_EVENT_TYPE=${env.GERRIT_EVENT_TYPE}")
-                        }
-                    } else {
-                        common.infoMsg("Skipping publishing metadata because PUBLISH_METADATA=${publishMetadata}")
+                stage("Process results") {
+                    archiveArtifacts artifacts: 'image-list.txt'
+                    if(!brokenList.isEmpty()) {
+                        common.errorMsg("Failed to build some containers:\n${brokenList}\nSee log files at artifacts")
+                        archiveArtifacts artifacts: containerBuilderDir + '/containers/build-*.log'
+                        currentBuild.result = "FAILURE"
                     }
                 }
-            } catch (err) {
-                def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
-                common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
+
+                stage('Save metadata') {
+                    dir(artifactsDir){
+                        sh 'rm -f metadata.yaml'
+                        writeYaml file: 'metadata.yaml', data: metadata
+                    }
+                }
+
+                try {
+                    stage('Publish metadata') {
+                        if (publishMetadata) {
+                            if (isMerged) {
+                                def releaseWorkflow = new com.mirantis.mk.ReleaseWorkflow()
+                                def releaseMetadataRepoUrl = env.RELEASE_METADATA_GIT_URL ?: 'ssh://mcp-ci-gerrit@gerrit.mcp.mirantis.net:29418/mcp/artifact-metadata'
+                                def releaseMetadataGerritBranch = env.RELEASE_METADATA_PUBLISH_BRANCH ?: 'master'
+                                def releaseMetadataCredentialsId = env.RELEASE_METADATA_GIT_CREDENTIALS_ID ?: 'mcp-ci-gerrit'
+                                def releaseMetadataDirDepth = 2
+                                Map releaseMetadataParams = [
+                                        'metadataCredentialsId': releaseMetadataCredentialsId,
+                                        'metadataGitRepoUrl': releaseMetadataRepoUrl,
+                                        'metadataGitRepoBranch': releaseMetadataGerritBranch,
+                                        'crTopic': 'update-tungsten-artifacts',
+                                        'comment': 'Update Tungsten Fabric artifacts',
+                                ]
+                                releaseWorkflow.updateReleaseMetadata(keysArr.join(';'), valuesArr.join(';'), releaseMetadataParams, releaseMetadataDirDepth)
+                            } else {
+                                common.infoMsg("Skipping publishing metadata because GERRIT_EVENT_TYPE=${env.GERRIT_EVENT_TYPE}")
+                            }
+                        } else {
+                            common.infoMsg("Skipping publishing metadata because PUBLISH_METADATA=${publishMetadata}")
+                        }
+                    }
+                } catch (err) {
+                    def releaseMetadataCatchedErrors = err.message ?: 'Failed to get error msg'
+                    common.warningMsg("Release metadata was not updated: ${releaseMetadataCatchedErrors}")
+                }
+
             }
 
+        } catch (Throwable e) {
+           // If there was an exception thrown, the build failed
+           currentBuild.result = "FAILURE"
+           throw e
+        } finally {
+           archiveArtifacts allowEmptyArchive: true, artifacts: "${artifactsDir}/*", excludes: null
+            if (cleanWorkspaceAfterBuild ) {
+                sh "sudo rm -rf ${workspace}/*"
+                deleteDir()
+            } else {
+                common.warningMsg("Skip environment deletion because CLEAN_WORKSPACE_AFTER_BUILD is false")
+            }
         }
-
-    } catch (Throwable e) {
-       // If there was an exception thrown, the build failed
-       currentBuild.result = "FAILURE"
-       throw e
-    } finally {
-       archiveArtifacts allowEmptyArchive: true, artifacts: "${artifactsDir}/*", excludes: null
-        if (cleanWorkspaceAfterBuild ) {
-            sh "sudo rm -rf ${workspace}/*"
-            deleteDir()
-        } else {
-            common.warningMsg("Skip environment deletion because CLEAN_WORKSPACE_AFTER_BUILD is false")
-        }
-    }
-}
+    } //node
+} //throttle
