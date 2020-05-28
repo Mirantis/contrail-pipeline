@@ -222,7 +222,7 @@ throttle(throttleCategories) {
                 def metadata = ['images': ['tungsten': ['r51': [:], ]]]
 
                 stage("contrail-api-client wheel") {
-                      sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel setuptools"
+                      sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox pip install -U wheel==0.34.2 setuptools==44.1.0"
                       sh "docker exec -w /root/contrail/src/contrail-api-client/base/ tf-developer-sandbox sed -i -r 's/(.*)/\\1.${timestamp}/' version.info"
                       sh "docker exec -w /root/contrail/src/contrail-api-client/ tf-developer-sandbox scons"
                       sh "docker exec -w /root/contrail/src/contrail-api-client/build/debug/api-lib/ tf-developer-sandbox python setup.py bdist_wheel --universal"
