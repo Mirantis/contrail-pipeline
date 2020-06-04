@@ -209,10 +209,10 @@ throttle(throttleCategories) {
 
                   sh '''
                       echo "INFO: make container-general-base $(date)"
-                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory container-general-base
+                      docker exec tf-developer-sandbox make CONTRAIL_REGISTRY_PUSH=0 -C ./tf-dev-env --no-print-directory container-general-base
 
                       echo "INFO: make containers-only $(date)"
-                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory containers-only || EXIT_CODE=$?
+                      docker exec tf-developer-sandbox make CONTRAIL_REGISTRY_PUSH=0 -C ./tf-dev-env --no-print-directory containers-only || EXIT_CODE=$?
                       #TODO: parse errors and archive logs. possible with junit
                   '''
                 }
