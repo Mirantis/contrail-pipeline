@@ -202,8 +202,8 @@ throttle(throttleCategories) {
                     // checkout to change request if needed
                     // TODO: implement versioning
                   sh '''
-                      echo "INFO: make create-repo prepare-containers prepare-status-containers $(date)"
-                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 3 create-repo prepare-containers prepare-status-containers
+                      echo "INFO: make create-repo prepare-containers prepare-status-containers prepare-tungsten-pytest $(date)"
+                      docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory -j 3 create-repo prepare-containers prepare-status-containers prepare-tungsten-pytest
                   '''
                   listContainers = sh(script: "docker exec tf-developer-sandbox make -C ./tf-dev-env --no-print-directory list-containers", returnStdout: true).trim().tokenize()
 
