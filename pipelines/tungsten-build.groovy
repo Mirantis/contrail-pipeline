@@ -103,6 +103,7 @@ throttle(throttleCategories) {
                 stage("prepare") {
                   sh '''
                       sudo rm -rf *
+                      docker rmi --force ${DEVENVIMAGE}:${DEVENVTAG}
                       git clone https://gerrit.mcp.mirantis.com/tungsten/tf-dev-env -b mcp/R5.1
                       cd tf-dev-env
                       if [ "${GERRIT_PROJECT##*/}" = "tf-dev-env" ]; then
