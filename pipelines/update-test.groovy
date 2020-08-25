@@ -97,7 +97,7 @@ timeout(time: 8, unit: 'HOURS') {
         try {
             stage('Prepare'){
                 wrap([$class: 'BuildUser']) {
-                    if (env.BUILD_USER_ID) {
+                    if (!['scmChange', 'timer'].contains(env.BUILD_USER_ID)) {
                         stackName = "${env.BUILD_USER_ID}-${JOB_NAME}-${BUILD_NUMBER}"
                         projectName = 'networking-team'
                     } else {
@@ -399,7 +399,7 @@ timeout(time: 8, unit: 'HOURS') {
             throw e
         } finally {
             stage ("Delete stack") {
-                if (env.BUILD_USER_ID) {
+                if (!['scmChange', 'timer'].contains(env.BUILD_USER_ID)) {
                     common.warningMsg("Skip environment deletion because of manual job run")
                 } else {
                     if ( (currentBuild.result != 'FAILURE')
