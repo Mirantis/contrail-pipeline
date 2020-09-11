@@ -101,7 +101,7 @@ def getSnapshotMeta(repoUrl) {
 }
 
 
-timeout(time: 8, unit: 'HOURS') {
+timeout(time: 10, unit: 'HOURS') {
     node ('python'){
         try {
             stage('Prepare'){
