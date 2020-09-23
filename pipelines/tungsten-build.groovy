@@ -355,6 +355,7 @@ throttle(throttleCategories) {
         } finally {
            archiveArtifacts allowEmptyArchive: true, artifacts: "${artifactsDir}/*", excludes: null
             if (cleanWorkspaceAfterBuild ) {
+                sh "./tf-dev-env/cleanup.sh -v"
                 sh "sudo rm -rf ${workspace}/*"
                 deleteDir()
             } else {
